@@ -1,14 +1,25 @@
-// Global variable for file list
+// Global variables
 var repoFiles = [];
 window.repoFiles = repoFiles;
 
-// Global variable for selected files
 var selectedFiles = [];
 window.selectedFiles = selectedFiles;
 
-// Global variable for ordered files
 var orderedFiles = [];
 window.orderedFiles = orderedFiles;
+
+var processedFiles = [];
+window.processedFiles = processedFiles;
+
+// Current repo info
+var currentOwner = '';
+var currentRepo = '';
+var currentBranch = '';
+var currentToken = '';
+window.currentOwner = currentOwner;
+window.currentRepo = currentRepo;
+window.currentBranch = currentBranch;
+window.currentToken = currentToken;
 
 const TOKEN_KEY = 'github_token';
 const LARGE_FILE_LIMIT = 200 * 1024; // 200 KB in bytes
@@ -25,6 +36,66 @@ const LOCKFILES = new Set([
 const IGNORED_DIRS = new Set([
   'node_modules', 'dist', 'build', '.git', '.next', '__pycache__'
 ]);
+
+const EXTENSION_TO_LANGUAGE = {
+  js: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  jsx: 'javascript',
+  ts: 'typescript',
+  mts: 'typescript',
+  cts: 'typescript',
+  tsx: 'typescript',
+  html: 'xml',
+  htm: 'xml',
+  xml: 'xml',
+  svg: 'xml',
+  css: 'css',
+  scss: 'scss',
+  sass: 'scss',
+  less: 'less',
+  json: 'json',
+  json5: 'json',
+  md: 'markdown',
+  markdown: 'markdown',
+  py: 'python',
+  pyw: 'python',
+  rb: 'ruby',
+  rs: 'rust',
+  go: 'go',
+  java: 'java',
+  c: 'c',
+  h: 'c',
+  cpp: 'cpp',
+  hpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  cs: 'csharp',
+  php: 'php',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  yaml: 'yaml',
+  yml: 'yaml',
+  toml: 'ini',
+  ini: 'ini',
+  sql: 'sql',
+  dockerfile: 'dockerfile',
+  makefile: 'makefile',
+  mk: 'makefile',
+  graphql: 'graphql',
+  gql: 'graphql',
+  lua: 'lua',
+  swift: 'swift',
+  kt: 'kotlin',
+  kts: 'kotlin',
+  r: 'r',
+  dart: 'dart',
+  scala: 'scala',
+  diff: 'diff',
+  patch: 'diff',
+  txt: 'plaintext'
+};
 
 // DOM Elements: Form & Step 1
 const form = document.getElementById('repo-form');
@@ -53,6 +124,16 @@ const sortFoldersBtn = document.getElementById('sort-folders-btn');
 const sortOriginalBtn = document.getElementById('sort-original-btn');
 const orderBackBtn = document.getElementById('order-back-btn');
 const orderNextBtn = document.getElementById('order-next-btn');
+
+// DOM Elements: Step 4 (Content Fetching & Highlighting Screen)
+const fetchContainer = document.getElementById('fetch-container') || document.querySelector('.fetch-container');
+const progressTextEl = document.getElementById('progress-text');
+const progressBarFillEl = document.getElementById('progress-bar-fill');
+const fetchStatusLineEl = document.getElementById('fetch-status-line');
+const skippedContainerEl = document.getElementById('skipped-container');
+const skippedCountEl = document.getElementById('skipped-count');
+const skippedListEl = document.getElementById('skipped-list');
+const fetchBackBtn = document.getElementById('fetch-back-btn');
 
 // State
 var selectedFilePaths = new Set();
@@ -464,6 +545,7 @@ function renderTree(files) {
       fileTreeEl.removeChild(fileTreeEl.firstChild);
     }
   }
+
   allFileNodes = [];
   allFolderNodes = [];
   window.allFileNodes = allFileNodes;
@@ -492,6 +574,7 @@ function renderTree(files) {
   updateAllFolderStates();
   updateSelectionSummary();
   if (orderContainer) orderContainer.hidden = true;
+  if (fetchContainer) fetchContainer.hidden = true;
   treeContainer.hidden = false;
 }
 
@@ -675,6 +758,7 @@ function openOrderingScreen() {
   window.orderedFiles = orderedFiles;
 
   if (treeContainer) treeContainer.hidden = true;
+  if (fetchContainer) fetchContainer.hidden = true;
   if (orderContainer) orderContainer.hidden = false;
 
   renderOrderListDOM();
@@ -723,11 +807,263 @@ if (orderBackBtn) {
   });
 }
 
-// Step 3 Next button
+// Step 3 Next button -> transitions to Step 4
 if (orderNextBtn) {
   orderNextBtn.addEventListener('click', () => {
-    console.log('Step 3 confirmed. Final ordered files:', window.orderedFiles);
-    setStatus(`Ordering confirmed: ${orderedFiles.length} files selected.`);
+    openFetchScreen();
+  });
+}
+
+// ==========================================
+// Step 4: Content Fetching & Highlighting
+// ==========================================
+
+// Detect language from file path
+function detectLanguage(filePath) {
+  const fileName = filePath.split('/').pop().toLowerCase();
+  if (fileName === 'dockerfile') return 'dockerfile';
+  if (fileName === 'makefile') return 'makefile';
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot !== -1 && lastDot < fileName.length - 1) {
+    const ext = fileName.slice(lastDot + 1);
+    if (EXTENSION_TO_LANGUAGE[ext]) {
+      return EXTENSION_TO_LANGUAGE[ext];
+    }
+  }
+  return 'plaintext';
+}
+
+// Normalise tabs to 4 spaces and line endings to \n
+function normalizeText(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\t/g, '    ');
+}
+
+// Check if content looks binary
+function isBinaryContent(text) {
+  if (typeof text !== 'string') return true;
+  if (text.includes('\0')) return true;
+
+  const sample = text.slice(0, 4000);
+  let controlChars = 0;
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i);
+    // Allow tab (9), newline (10), carriage return (13)
+    if ((code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 65533) {
+      controlChars++;
+    }
+  }
+  return controlChars > sample.length * 0.1;
+}
+
+// Highlight code using highlight.js
+function highlightCode(code, language) {
+  if (typeof hljs !== 'undefined') {
+    if (language && language !== 'plaintext' && hljs.getLanguage(language)) {
+      try {
+        return hljs.highlight(code, { language }).value;
+      } catch (_) {}
+    }
+    try {
+      return hljs.highlight(code, { language: 'plaintext' }).value;
+    } catch (_) {}
+  }
+  return escapeHtml(code);
+}
+
+// Split highlighted HTML into lines preserving open span tags on every line
+function splitHighlightedIntoLines(html) {
+  const lines = [];
+  const openTags = [];
+  let currentLine = '';
+
+  const tokenRegex = /(<span[^>]*>|<\/span>|\n|[^<\n]+|<)/g;
+  let match;
+
+  while ((match = tokenRegex.exec(html)) !== null) {
+    const token = match[0];
+
+    if (token === '\n') {
+      let closedLine = currentLine;
+      for (let i = openTags.length - 1; i >= 0; i--) {
+        closedLine += '</span>';
+      }
+      lines.push(closedLine);
+
+      currentLine = '';
+      for (let i = 0; i < openTags.length; i++) {
+        currentLine += openTags[i];
+      }
+    } else if (token.startsWith('<span')) {
+      openTags.push(token);
+      currentLine += token;
+    } else if (token === '</span>') {
+      if (openTags.length > 0) {
+        openTags.pop();
+      }
+      currentLine += token;
+    } else {
+      currentLine += token;
+    }
+  }
+
+  let closedLine = currentLine;
+  for (let i = openTags.length - 1; i >= 0; i--) {
+    closedLine += '</span>';
+  }
+  lines.push(closedLine);
+
+  return lines;
+}
+
+// Fetch single file content and process
+async function fetchAndProcessFile(file) {
+  const path = file.path;
+  let text = '';
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+
+  if (currentToken) {
+    // With token: GitHub contents API with Accept: application/vnd.github.raw+json
+    const url = `https://api.github.com/repos/${encodeURIComponent(currentOwner)}/${encodeURIComponent(currentRepo)}/contents/${encodedPath}?ref=${encodeURIComponent(currentBranch)}`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept': 'application/vnd.github.raw+json',
+        'Authorization': `Bearer ${currentToken}`
+      }
+    });
+    if (!res.ok) {
+      return { skipped: true, path, reason: `HTTP ${res.status} ${res.statusText}` };
+    }
+    text = await res.text();
+  } else {
+    // Public repo: https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+    const url = `https://raw.githubusercontent.com/${encodeURIComponent(currentOwner)}/${encodeURIComponent(currentRepo)}/${encodeURIComponent(currentBranch)}/${encodedPath}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      return { skipped: true, path, reason: `HTTP ${res.status} ${res.statusText}` };
+    }
+    text = await res.text();
+  }
+
+  if (isBinaryContent(text)) {
+    return { skipped: true, path, reason: 'Looks binary' };
+  }
+
+  const normalized = normalizeText(text);
+  const language = detectLanguage(path);
+  const highlightedHtml = highlightCode(normalized, language);
+  const lines = splitHighlightedIntoLines(highlightedHtml);
+
+  return { skipped: false, path, language, lines };
+}
+
+// Concurrent worker pool: fetch 5 at a time
+async function runConcurrentFetch(files, concurrency = 5, onProgress) {
+  const results = [];
+  const skipped = [];
+  let completed = 0;
+  let nextIdx = 0;
+
+  async function worker() {
+    while (nextIdx < files.length) {
+      const idx = nextIdx++;
+      const file = files[idx];
+      try {
+        const item = await fetchAndProcessFile(file);
+        if (item.skipped) {
+          skipped.push(item);
+        } else {
+          results.push(item);
+        }
+      } catch (err) {
+        skipped.push({ path: file.path, reason: err.message || 'Fetch failed' });
+      }
+      completed++;
+      if (onProgress) {
+        onProgress(completed, files.length, file.path);
+      }
+    }
+  }
+
+  const workers = [];
+  const poolSize = Math.min(concurrency, files.length);
+  for (let i = 0; i < poolSize; i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+
+  // Preserve the user-specified order
+  const orderMap = new Map();
+  files.forEach((f, i) => orderMap.set(f.path, i));
+  results.sort((a, b) => (orderMap.get(a.path) ?? 0) - (orderMap.get(b.path) ?? 0));
+
+  return { results, skipped };
+}
+
+// Enter Step 4: Content Fetching screen
+async function openFetchScreen() {
+  if (!orderedFiles || orderedFiles.length === 0) return;
+
+  if (orderContainer) orderContainer.hidden = true;
+  if (fetchContainer) fetchContainer.hidden = false;
+
+  const total = orderedFiles.length;
+  if (progressTextEl) progressTextEl.textContent = `0 / ${total}`;
+  if (progressBarFillEl) progressBarFillEl.style.width = '0%';
+  if (fetchStatusLineEl) fetchStatusLineEl.textContent = 'Starting download...';
+  if (skippedContainerEl) skippedContainerEl.hidden = true;
+  if (skippedListEl) skippedListEl.innerHTML = '';
+  if (fetchBackBtn) fetchBackBtn.disabled = true;
+
+  const skippedList = [];
+
+  const { results, skipped } = await runConcurrentFetch(orderedFiles, 5, (completed, totalCount, lastPath) => {
+    if (progressTextEl) {
+      progressTextEl.textContent = `${completed} / ${totalCount}`;
+    }
+    if (progressBarFillEl) {
+      const pct = Math.round((completed / totalCount) * 100);
+      progressBarFillEl.style.width = `${pct}%`;
+    }
+    if (fetchStatusLineEl) {
+      fetchStatusLineEl.textContent = `Processing (${completed}/${totalCount}): ${lastPath}`;
+    }
+  });
+
+  processedFiles = results.map(({ path, language, lines }) => ({ path, language, lines }));
+  window.processedFiles = processedFiles;
+
+  // Display skipped files if any
+  if (skipped.length > 0 && skippedContainerEl && skippedListEl) {
+    skippedContainerEl.hidden = false;
+    if (skippedCountEl) skippedCountEl.textContent = String(skipped.length);
+    skippedListEl.innerHTML = '';
+    for (const item of skipped) {
+      const li = document.createElement('li');
+      li.className = 'skipped-item';
+      li.innerHTML = `<strong>${escapeHtml(item.path)}</strong>: ${escapeHtml(item.reason)}`;
+      skippedListEl.appendChild(li);
+    }
+  }
+
+  if (fetchStatusLineEl) {
+    fetchStatusLineEl.textContent = `Completed: ${processedFiles.length} files processed${skipped.length > 0 ? `, ${skipped.length} skipped` : ''}.`;
+  }
+  if (fetchBackBtn) {
+    fetchBackBtn.disabled = false;
+  }
+
+  console.log('Step 4 results ready in window.processedFiles:', window.processedFiles);
+}
+
+// Step 4 Back button -> returns to Step 3
+if (fetchBackBtn) {
+  fetchBackBtn.addEventListener('click', () => {
+    if (fetchContainer) fetchContainer.hidden = true;
+    if (orderContainer) orderContainer.hidden = false;
   });
 }
 
@@ -779,10 +1115,18 @@ async function handleLoad(e) {
     setStatus('invalid URL', 'error');
     if (treeContainer) treeContainer.hidden = true;
     if (orderContainer) orderContainer.hidden = true;
+    if (fetchContainer) fetchContainer.hidden = true;
     return;
   }
 
   const { owner, repo } = parsed;
+  currentOwner = owner;
+  currentRepo = repo;
+  currentToken = token;
+  window.currentOwner = currentOwner;
+  window.currentRepo = currentRepo;
+  window.currentToken = currentToken;
+
   const headers = {
     'Accept': 'application/vnd.github.v3+json'
   };
@@ -793,6 +1137,7 @@ async function handleLoad(e) {
   if (loadBtn) loadBtn.disabled = true;
   if (treeContainer) treeContainer.hidden = true;
   if (orderContainer) orderContainer.hidden = true;
+  if (fetchContainer) fetchContainer.hidden = true;
   setStatus('Loading...', 'loading');
 
   try {
@@ -809,6 +1154,9 @@ async function handleLoad(e) {
       setStatus('repo not found or private', 'error');
       return;
     }
+
+    currentBranch = defaultBranch;
+    window.currentBranch = currentBranch;
 
     // 2. Get recursive tree for default branch
     const treeRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`, { headers });

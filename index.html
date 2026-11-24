@@ -97,140 +97,216 @@
           </ol>
         </nav>
 
-        <!-- Step 1: Input Section with Tabs -->
-        <div id="input-section" class="input-section card">
-          <div class="step-card-header">
-            <div class="step-card-header-inner">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="card-icon">
-                <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path>
-                <path d="M9 18c-4.51 2-5-2-7-2"></path>
-              </svg>
-              <h2 class="step-card-title">Choose repository source</h2>
-            </div>
-            <span class="badge">Step 1 of 4</span>
-          </div>
+        <!-- Step 1: Input Section (3 Methods: GitHub URL, Upload ZIP, Upload files) -->
+        <div id="input-section" class="input-section">
+          <div class="input-cards-layout">
 
-          <div class="step-card-body">
-            <div class="tabs-nav" role="tablist">
-              <button type="button" id="tab-github-btn" class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-github-panel">GitHub URL</button>
-              <button type="button" id="tab-zip-btn" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-zip-panel">Upload ZIP</button>
+            <!-- Card 1: GitHub URL (Full width on top) -->
+            <div class="card input-card github-card">
+              <div class="step-card-header">
+                <div class="step-card-header-inner">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="card-icon">
+                    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path>
+                    <path d="M9 18c-4.51 2-5-2-7-2"></path>
+                  </svg>
+                  <h2 class="step-card-title">GitHub URL</h2>
+                </div>
+                <span class="badge">Step 1 of 4</span>
+              </div>
+
+              <div class="step-card-body">
+                <form id="repo-form">
+                  <div class="form-group">
+                    <label for="repo-url">GitHub repo URL</label>
+                    <div class="input-row">
+                      <input
+                        type="text"
+                        id="repo-url"
+                        name="repo-url"
+                        placeholder="https://github.com/owner/repo"
+                        required
+                        autocomplete="off"
+                        spellcheck="false"
+                      >
+                      <button type="submit" id="load-btn" class="btn-primary">Load</button>
+                    </div>
+                  </div>
+
+                  <!-- GitHub Auth Section (Rate Limit & Private Repos) -->
+                  <div class="auth-section">
+                    <div class="auth-header">
+                      <div class="auth-header-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="auth-info-icon">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="16" x2="12" y2="12"/>
+                          <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <span>Hitting GitHub's rate limit?</span>
+                      </div>
+                      <p class="auth-header-desc">
+                        GitHub limits anonymous requests to 60/hr. If you hit the rate limit or want to export private repos, log in or provide a token:
+                      </p>
+                    </div>
+
+                    <!-- Logged in state -->
+                    <div id="github-logged-in-container" class="github-logged-in-container" hidden>
+                      <div class="logged-in-badge">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span class="logged-in-text">Connected to GitHub</span>
+                      </div>
+                      <button type="button" id="github-logout-btn" class="btn-secondary btn-sm">Disconnect</button>
+                    </div>
+
+                    <!-- Single line auth row with divider -->
+                    <div class="auth-row">
+                      <div id="github-login-container" class="github-login-container">
+                        <button type="button" id="github-login-btn" class="btn-secondary auth-login-btn">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                          </svg>
+                          <span>Login with GitHub</span>
+                        </button>
+                      </div>
+
+                      <span class="auth-divider-text">or</span>
+
+                      <div id="manual-token-container" class="manual-token-container">
+                        <div class="token-input-wrap">
+                          <input
+                            type="password"
+                            id="token"
+                            name="token"
+                            placeholder="Paste personal token"
+                            autocomplete="off"
+                            spellcheck="false"
+                          >
+                          <a href="#" id="token-help-toggle" class="help-link token-help-btn" role="button" aria-expanded="false" aria-controls="token-help-box">Help?</a>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Token Help Box (expandable) -->
+                    <div id="token-help-box" class="help-box" hidden>
+                      <p class="help-text">
+                        A personal token unlocks 5,000 requests/hr and private repos. It is optional for public repos.
+                      </p>
+                      <ol class="help-steps">
+                        <li>1. On GitHub, open <strong>Settings &gt; Developer settings &gt; Personal access tokens</strong>.</li>
+                        <li>2. Generate a token with read access to repository contents.</li>
+                        <li>3. Paste the token into the input field above.</li>
+                      </ol>
+                    </div>
+
+                    <!-- Privacy reassurance notice -->
+                    <p class="auth-privacy-banner">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="privacy-icon">
+                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                      <span>
+                        We do not store your token. It is stored purely locally in your browser. Don't believe me?
+                        <a href="https://github.com/oceanmallik/git2pdf" target="_blank" rel="noopener noreferrer">See the code on GitHub</a>.
+                      </span>
+                    </p>
+                  </div>
+                </form>
+              </div>
             </div>
 
-            <!-- Tab 1: GitHub URL Panel -->
-            <div id="tab-github-panel" class="tab-panel active" role="tabpanel" aria-labelledby="tab-github-btn">
-              <form id="repo-form">
-                <div class="form-group">
-                  <label for="repo-url">GitHub repo URL</label>
-                  <div class="input-row">
-                    <input
-                      type="text"
-                      id="repo-url"
-                      name="repo-url"
-                      placeholder="https://github.com/owner/repo"
-                      required
-                      autocomplete="off"
-                      spellcheck="false"
-                    >
-                    <button type="submit" id="load-btn" class="btn-primary">Load</button>
+            <!-- Two Cards Side by Side: Upload ZIP and Upload files -->
+            <div class="input-secondary-cards">
+
+              <!-- Card 2: Upload ZIP -->
+              <div class="card input-card zip-card">
+                <div class="step-card-header">
+                  <div class="step-card-header-inner">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="card-icon">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                      <polyline points="3.29 7 12 12 20.71 7"/>
+                      <line x1="12" y1="22" x2="12" y2="12"/>
+                    </svg>
+                    <h2 class="step-card-title">Upload ZIP</h2>
                   </div>
                 </div>
 
-                <!-- GitHub Auth Section (Rate Limit & Private Repos) -->
-                <div class="auth-section">
-                  <div class="auth-header">
-                    <div class="auth-header-title">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="auth-info-icon">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="16" x2="12" y2="12"/>
-                        <line x1="12" y1="8" x2="12.01" y2="8"/>
-                      </svg>
-                      <span>Hitting GitHub's rate limit?</span>
-                    </div>
-                    <p class="auth-header-desc">
-                      GitHub limits anonymous requests to 60/hr. If you hit the rate limit or want to export private repos, log in or provide a token:
-                    </p>
-                  </div>
-
-                  <!-- Logged in view (hidden by default) -->
-                  <div id="github-logged-in-container" class="github-logged-in-container" hidden>
-                    <div class="logged-in-badge">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span class="logged-in-text">Logged in with GitHub</span>
-                    </div>
-                    <button type="button" id="github-logout-btn" class="btn-secondary">Log out</button>
-                  </div>
-
-                  <!-- Logged out view: One-line Auth Row divided by "or" -->
-                  <div class="auth-row">
-                    <div id="github-login-container" class="github-login-container">
-                      <button type="button" id="github-login-btn" class="btn-secondary auth-login-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                          <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path>
-                          <path d="M9 18c-4.51 2-5-2-7-2"></path>
-                        </svg>
-                        <span>Login with GitHub</span>
-                      </button>
-                    </div>
-
-                    <span class="auth-divider-text">or</span>
-
-                    <div id="manual-token-container" class="manual-token-container">
-                      <div class="token-input-wrap">
-                        <input
-                          type="password"
-                          id="token"
-                          name="token"
-                          placeholder="Paste personal token"
-                          autocomplete="off"
-                        >
-                        <a href="#" id="token-help-toggle" class="help-link token-help-btn" role="button" aria-expanded="false" aria-controls="token-help-box">Help?</a>
+                <div class="step-card-body flex-col-between">
+                  <div>
+                    <div id="zip-dropzone" class="zip-dropzone" tabindex="0" role="button" aria-label="Drop your project ZIP here or click to choose">
+                      <input type="file" id="zip-file-input" accept=".zip" hidden>
+                      <div class="dropzone-inner">
+                        <div class="dropzone-icon-wrap">
+                          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                          </svg>
+                        </div>
+                        <p class="dropzone-text">Drop your project ZIP here or click to choose</p>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Token Help Box (collapsible) -->
-                  <div id="token-help-box" class="help-box" hidden>
-                    <p>A personal token unlocks 5,000 requests/hr and private repos. It is completely optional for public repos.</p>
-                    <ol class="help-steps">
-                      <li>1. On GitHub, open <strong>Settings &gt; Developer settings &gt; Personal access tokens</strong>.</li>
-                      <li>2. Generate a fine-grained or classic token with read-only Repository Contents permission.</li>
-                      <li>3. Paste the token above.</li>
-                    </ol>
+                  <div class="zip-help-row">
+                    <a href="#" id="zip-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="zip-help-box">How to get a ZIP</a>
+                    <div id="zip-help-box" class="help-box" hidden>
+                      <p>On GitHub, open your repository, click the green Code button, then Download ZIP.</p>
+                      <p>Your project is read locally in your browser. Nothing is uploaded anywhere.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 3: Upload files -->
+              <div class="card input-card files-card">
+                <div class="step-card-header">
+                  <div class="step-card-header-inner">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="card-icon">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="12" y1="18" x2="12" y2="12"/>
+                      <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    <h2 class="step-card-title">Upload files</h2>
+                  </div>
+                </div>
+
+                <div class="step-card-body flex-col-between">
+                  <div class="files-body-main">
+                    <div id="files-dropzone" class="zip-dropzone files-dropzone" tabindex="0" role="button" aria-label="Drop your code files here or click to choose">
+                      <input type="file" id="files-input" multiple hidden>
+                      <div class="dropzone-inner">
+                        <div class="dropzone-icon-wrap">
+                          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="15" y2="15"/>
+                          </svg>
+                        </div>
+                        <p class="dropzone-text">Drop your code files here or click to choose</p>
+                      </div>
+                    </div>
+
+                    <!-- Chosen files list (shown only when at least 1 file chosen) -->
+                    <div id="chosen-files-container" class="chosen-files-container" hidden>
+                      <ul id="chosen-files-list" class="chosen-files-list" aria-label="Selected files"></ul>
+                    </div>
                   </div>
 
-                  <!-- Gentle privacy guarantee banner -->
-                  <p class="auth-privacy-banner">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="privacy-icon">
-                      <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                    <span>
-                      We do not store your token. It is stored purely locally in your browser. Don't believe me?
-                      <a href="https://github.com/oceanmallik/git2pdf" target="_blank" rel="noopener noreferrer">See the code on GitHub</a>.
-                    </span>
-                  </p>
+                  <!-- Card footer: Clear on left, Continue on right -->
+                  <div class="files-card-footer">
+                    <button type="button" id="files-clear-btn" class="btn-secondary btn-sm" hidden>Clear</button>
+                    <div class="files-footer-spacer"></div>
+                    <button type="button" id="files-continue-btn" class="btn-primary" disabled>Continue</button>
+                  </div>
                 </div>
-              </form>
-            </div>
+              </div>
 
-            <!-- Tab 2: Upload ZIP Panel -->
-            <div id="tab-zip-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-zip-btn" hidden>
-              <div id="zip-dropzone" class="zip-dropzone" tabindex="0" role="button" aria-label="Drop your project ZIP here or click to choose">
-                <input type="file" id="zip-file-input" accept=".zip" hidden>
-                <div class="dropzone-text">Drop your project ZIP here or click to choose</div>
-              </div>
-              <div class="zip-help-row">
-                <a href="#" id="zip-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="zip-help-box">How to get a ZIP</a>
-              </div>
-              <div id="zip-help-box" class="help-box" hidden>
-                <p>On GitHub, open your repository, click the green Code button, then Download ZIP.</p>
-                <p>Your project is read in your browser. Nothing is uploaded anywhere.</p>
-              </div>
             </div>
           </div>
-        </div>
 
-        <div id="status" class="status-line" role="status" aria-live="polite"></div>
+          <div id="status" class="status-line" role="status" aria-live="polite"></div>
+        </div>
 
         <!-- Step 2: File Tree Selection Screen -->
         <div id="tree-container" class="tree-container card" hidden>

@@ -791,14 +791,10 @@ input[type="checkbox"] {
 }
 
 /* ==========================================================================
-   INTERACTIVE WORKSPACE SECTIONS
+   INTERACTIVE WORKSPACE SECTIONS & INPUT METHODS (GITHUB, ZIP, FILES)
    ========================================================================== */
 .input-section {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  transition: border-color 150ms ease;
+  display: block;
 }
 
 .input-section[hidden],
@@ -808,11 +804,57 @@ input[type="checkbox"] {
   display: none !important;
 }
 
-/* ZIP Dropzone */
+/* 3-Input Load Step Layout: Full-width GitHub on top, 2 equal columns below */
+.input-cards-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-secondary-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .input-secondary-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.input-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 150ms ease;
+}
+
+.input-card:hover {
+  border-color: var(--border-hover);
+}
+
+.input-card .step-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-col-between {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* Dropzones (ZIP & Files) */
 .zip-dropzone {
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
-  padding: var(--space-12) var(--space-6);
+  padding: var(--space-8) var(--space-6);
   text-align: center;
   background-color: var(--bg-card);
   cursor: pointer;
@@ -836,6 +878,27 @@ input[type="checkbox"] {
   background-color: var(--bg-elevated);
 }
 
+.dropzone-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.dropzone-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.dropzone-icon {
+  width: 24px;
+  height: 24px;
+}
+
 .dropzone-text {
   font-size: var(--text-14);
   color: var(--text-muted);
@@ -846,6 +909,105 @@ input[type="checkbox"] {
 .zip-help-row {
   margin-top: var(--space-3);
   margin-bottom: var(--space-1);
+}
+
+/* Chosen Files List (Upload Files Card) */
+.files-body-main {
+  flex: 1;
+}
+
+.chosen-files-container {
+  margin-top: var(--space-3);
+}
+
+.chosen-files-container[hidden] {
+  display: none !important;
+}
+
+.chosen-files-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-elevated);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chosen-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+
+.chosen-file-row:last-child {
+  border-bottom: none;
+}
+
+.chosen-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chosen-file-name {
+  font-family: var(--code-font, 'JetBrains Mono', monospace);
+  font-size: var(--text-12);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chosen-file-size {
+  font-size: var(--text-12);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chosen-file-remove-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.chosen-file-remove-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-card);
+  border-color: var(--border-hover);
+}
+
+/* Files Card Footer (Clear & Continue) */
+.files-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.files-footer-spacer {
+  flex: 1;
 }
 
 /* Auth Section */

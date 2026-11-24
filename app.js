@@ -78,13 +78,17 @@ function uint8ArrayToDataUrl(uint8, ext) {
 }
 
 // Current repo / project info
-var currentSource = 'github'; // 'github' or 'zip'
+var currentSource = 'github'; // 'github', 'zip', or 'files'
 var currentOwner = '';
 var currentRepo = '';
 var currentBranch = '';
 var currentToken = '';
 var currentZipFileName = '';
 var zipFileContents = new Map(); // path -> Uint8Array
+
+// Upload files state
+var chosenFiles = []; // array of { name: string, file: File, size: number }
+var uploadedFileContents = new Map(); // name -> Uint8Array
 
 window.currentSource = currentSource;
 window.currentOwner = currentOwner;
@@ -93,10 +97,14 @@ window.currentBranch = currentBranch;
 window.currentToken = currentToken;
 window.currentZipFileName = currentZipFileName;
 window.zipFileContents = zipFileContents;
+window.chosenFiles = chosenFiles;
+window.uploadedFileContents = uploadedFileContents;
 
 const TOKEN_KEY = 'github_token';
 const LARGE_FILE_LIMIT = 200 * 1024; // 200 KB in bytes
 const MAX_ZIP_SIZE = 100 * 1024 * 1024; // 100 MB max zip size
+const MAX_UPLOADED_FILE_SIZE = 10 * 1024 * 1024; // 10 MB per file
+const MAX_UPLOADED_FILES_COUNT = 500; // max 500 files
 
 const BINARY_EXTENSIONS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'svg', 'pdf',
@@ -198,6 +206,14 @@ const zipDropzone = document.getElementById('zip-dropzone');
 const zipFileInput = document.getElementById('zip-file-input');
 const zipHelpToggle = document.getElementById('zip-help-toggle');
 const zipHelpBox = document.getElementById('zip-help-box');
+
+// DOM Elements: Upload Files
+const filesDropzone = document.getElementById('files-dropzone');
+const filesInput = document.getElementById('files-input');
+const chosenFilesContainer = document.getElementById('chosen-files-container');
+const chosenFilesList = document.getElementById('chosen-files-list');
+const filesClearBtn = document.getElementById('files-clear-btn');
+const filesContinueBtn = document.getElementById('files-continue-btn');
 
 // DOM Elements: Step 2 (Tree Screen)
 const treeContainer = document.getElementById('tree-container') || document.querySelector('.tree-container');
@@ -498,7 +514,7 @@ if (githubLogoutBtn) {
 // Initialise auth on page load
 handleOAuthCallback();
 
-// Clear state helper (used on tab switch & start over)
+// Clear state helper (used on start over)
 function clearState() {
   repoFiles = [];
   selectedFiles = [];
@@ -520,9 +536,16 @@ function clearState() {
 
   zipFileContents.clear();
   currentZipFileName = '';
-  currentSource = activeTab === 'zip' ? 'zip' : 'github';
+  currentSource = 'github';
   window.currentSource = currentSource;
   window.currentZipFileName = currentZipFileName;
+
+  // Clear chosen uploaded files
+  chosenFiles = [];
+  window.chosenFiles = chosenFiles;
+  uploadedFileContents.clear();
+  if (filesInput) filesInput.value = '';
+  renderChosenFilesList();
 
   if (fileTreeEl) fileTreeEl.innerHTML = '';
   if (orderListEl) orderListEl.innerHTML = '';
@@ -535,6 +558,7 @@ function clearState() {
 
   if (zipFileInput) zipFileInput.value = '';
   if (zipDropzone) zipDropzone.classList.remove('dragover');
+  if (filesDropzone) filesDropzone.classList.remove('dragover');
 
   setStatus('');
 }
@@ -545,63 +569,12 @@ function showInitialScreen() {
   if (orderContainer) orderContainer.hidden = true;
   if (fetchContainer) fetchContainer.hidden = true;
   if (inputSection) inputSection.hidden = false;
-
-  if (activeTab === 'zip') {
-    if (tabGithubPanel) tabGithubPanel.hidden = true;
-    if (tabZipPanel) tabZipPanel.hidden = false;
-  } else {
-    if (tabGithubPanel) tabGithubPanel.hidden = false;
-    if (tabZipPanel) tabZipPanel.hidden = true;
-  }
 }
 
 // Start over
 function startOver() {
   clearState();
   showInitialScreen();
-}
-
-// Switch tabs
-function switchTab(tab) {
-  if (tab === activeTab) return;
-  clearState();
-  activeTab = tab;
-  currentSource = tab;
-  window.currentSource = currentSource;
-
-  if (tab === 'github') {
-    if (tabGithubBtn) {
-      tabGithubBtn.classList.add('active');
-      tabGithubBtn.setAttribute('aria-selected', 'true');
-    }
-    if (tabZipBtn) {
-      tabZipBtn.classList.remove('active');
-      tabZipBtn.setAttribute('aria-selected', 'false');
-    }
-    if (tabGithubPanel) tabGithubPanel.hidden = false;
-    if (tabZipPanel) tabZipPanel.hidden = true;
-  } else {
-    if (tabZipBtn) {
-      tabZipBtn.classList.add('active');
-      tabZipBtn.setAttribute('aria-selected', 'true');
-    }
-    if (tabGithubBtn) {
-      tabGithubBtn.classList.remove('active');
-      tabGithubBtn.setAttribute('aria-selected', 'false');
-    }
-    if (tabGithubPanel) tabGithubPanel.hidden = true;
-    if (tabZipPanel) tabZipPanel.hidden = false;
-  }
-
-  showInitialScreen();
-}
-
-if (tabGithubBtn) {
-  tabGithubBtn.addEventListener('click', () => switchTab('github'));
-}
-
-if (tabZipBtn) {
-  tabZipBtn.addEventListener('click', () => switchTab('zip'));
 }
 
 // Parse GitHub repository URL
@@ -774,6 +747,16 @@ async function handleZipFile(file) {
     }
   }
 
+  // Clear other sources
+  chosenFiles = [];
+  window.chosenFiles = chosenFiles;
+  uploadedFileContents.clear();
+  if (filesInput) filesInput.value = '';
+  renderChosenFilesList();
+  currentOwner = '';
+  currentRepo = '';
+  currentBranch = '';
+
   // Build file list and keep each file's content in memory
   zipFileContents.clear();
   readmePreviewModes.clear();
@@ -858,6 +841,268 @@ if (zipDropzone && zipFileInput) {
       handleZipFile(e.dataTransfer.files[0]);
     }
   });
+}
+
+// ==========================================
+// Step 1: Upload Files (Separate Code Files) Handling
+// ==========================================
+
+// Prevent the browser from opening a file that is dropped outside drop zones
+window.addEventListener('dragover', (e) => {
+  e.preventDefault();
+}, false);
+
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+}, false);
+
+// Format file size for display
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Ensure unique file names with suffix "name (2).ext"
+function getUniqueFileName(originalName, existingNamesSet) {
+  if (!existingNamesSet.has(originalName)) {
+    return originalName;
+  }
+  const lastDot = originalName.lastIndexOf('.');
+  let base = (lastDot !== -1) ? originalName.slice(0, lastDot) : originalName;
+  let ext = (lastDot !== -1) ? originalName.slice(lastDot) : '';
+
+  let count = 2;
+  while (true) {
+    const candidate = `${base} (${count})${ext}`;
+    if (!existingNamesSet.has(candidate)) {
+      return candidate;
+    }
+    count++;
+  }
+}
+
+// Render the chosen files list inside the Upload files card
+function renderChosenFilesList() {
+  if (!chosenFilesList || !chosenFilesContainer) return;
+
+  if (chosenFiles.length === 0) {
+    chosenFilesContainer.hidden = true;
+    chosenFilesList.innerHTML = '';
+    if (filesClearBtn) filesClearBtn.hidden = true;
+    if (filesContinueBtn) filesContinueBtn.disabled = true;
+    return;
+  }
+
+  chosenFilesContainer.hidden = false;
+  if (filesClearBtn) filesClearBtn.hidden = false;
+  if (filesContinueBtn) filesContinueBtn.disabled = false;
+
+  chosenFilesList.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+
+  chosenFiles.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.className = 'chosen-file-row';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'chosen-file-info';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'chosen-file-name';
+    nameSpan.textContent = item.name;
+
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'chosen-file-size';
+    sizeSpan.textContent = formatFileSize(item.size);
+
+    infoDiv.appendChild(nameSpan);
+    infoDiv.appendChild(sizeSpan);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'chosen-file-remove-btn';
+    removeBtn.setAttribute('aria-label', `Remove ${item.name}`);
+    removeBtn.title = `Remove ${item.name}`;
+    removeBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    `;
+
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chosenFiles.splice(index, 1);
+      window.chosenFiles = chosenFiles;
+      renderChosenFilesList();
+    });
+
+    li.appendChild(infoDiv);
+    li.appendChild(removeBtn);
+    fragment.appendChild(li);
+  });
+
+  chosenFilesList.appendChild(fragment);
+}
+
+// Handle adding chosen files (via picker or drag-drop)
+function handleFilesAdded(fileList) {
+  if (!fileList || fileList.length === 0) return;
+
+  const existingNames = new Set(chosenFiles.map(f => f.name));
+  let oversizedName = null;
+  let addedCount = 0;
+
+  for (let i = 0; i < fileList.length; i++) {
+    if (chosenFiles.length >= MAX_UPLOADED_FILES_COUNT) {
+      break;
+    }
+    const file = fileList[i];
+    if (file.size > MAX_UPLOADED_FILE_SIZE) {
+      if (!oversizedName) {
+        oversizedName = file.name;
+      }
+      continue; // skip files over 10 MB, keep the rest
+    }
+
+    const uniqueName = getUniqueFileName(file.name, existingNames);
+    existingNames.add(uniqueName);
+
+    chosenFiles.push({
+      name: uniqueName,
+      file: file,
+      size: file.size
+    });
+    addedCount++;
+  }
+
+  window.chosenFiles = chosenFiles;
+
+  if (oversizedName) {
+    setStatus(`${oversizedName} is too large to read`, 'error');
+  } else if (addedCount > 0) {
+    setStatus('');
+  }
+
+  renderChosenFilesList();
+  if (filesInput) {
+    filesInput.value = '';
+  }
+}
+
+// Clear all chosen files
+function handleFilesClear() {
+  chosenFiles = [];
+  window.chosenFiles = chosenFiles;
+  uploadedFileContents.clear();
+  if (filesInput) filesInput.value = '';
+  renderChosenFilesList();
+  setStatus('');
+}
+
+// Continue with uploaded files
+async function handleFilesContinue() {
+  if (chosenFiles.length === 0) {
+    setStatus('No files selected', 'error');
+    return;
+  }
+
+  // Clear other sources
+  zipFileContents.clear();
+  currentZipFileName = '';
+  if (zipFileInput) zipFileInput.value = '';
+  currentOwner = '';
+  currentRepo = '';
+  currentBranch = '';
+
+  selectedFiles = [];
+  orderedFiles = [];
+  processedFiles = [];
+  readmePreviewModes.clear();
+  selectedFilePaths.clear();
+
+  currentSource = 'files';
+  window.currentSource = currentSource;
+
+  setStatus('Reading files...', 'loading');
+
+  uploadedFileContents.clear();
+  const fileList = [];
+  try {
+    for (const item of chosenFiles) {
+      const arrayBuffer = await item.file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      uploadedFileContents.set(item.name, uint8);
+      fileList.push({
+        path: item.name,
+        size: uint8.byteLength,
+        type: 'blob'
+      });
+    }
+  } catch (err) {
+    setStatus('Error reading files', 'error');
+    return;
+  }
+
+  repoFiles = fileList;
+  window.repoFiles = fileList;
+
+  setStatus(`Loaded ${fileList.length} files.`, 'success');
+  if (inputSection) inputSection.hidden = true;
+  renderTree(fileList);
+}
+
+// Bind Upload Files Dropzone events
+if (filesDropzone && filesInput) {
+  filesDropzone.addEventListener('click', () => {
+    filesInput.click();
+  });
+
+  filesDropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      filesInput.click();
+    }
+  });
+
+  filesInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFilesAdded(e.target.files);
+    }
+  });
+
+  filesDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    filesDropzone.classList.add('dragover');
+  });
+
+  filesDropzone.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    filesDropzone.classList.add('dragover');
+  });
+
+  filesDropzone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    filesDropzone.classList.remove('dragover');
+  });
+
+  filesDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    filesDropzone.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesAdded(e.dataTransfer.files);
+    }
+  });
+}
+
+if (filesClearBtn) {
+  filesClearBtn.addEventListener('click', handleFilesClear);
+}
+
+if (filesContinueBtn) {
+  filesContinueBtn.addEventListener('click', handleFilesContinue);
 }
 
 // Tree Node Class
@@ -1682,7 +1927,7 @@ async function openFetchScreen() {
   const total = orderedFiles.length;
   if (progressTextEl) progressTextEl.textContent = `0 / ${total}`;
   if (progressBarFillEl) progressBarFillEl.style.width = '0%';
-  if (fetchStatusLineEl) fetchStatusLineEl.textContent = (currentSource === 'zip') ? 'Processing files...' : 'Starting download...';
+  if (fetchStatusLineEl) fetchStatusLineEl.textContent = (currentSource === 'zip' || currentSource === 'files') ? 'Processing files...' : 'Starting download...';
   if (skippedContainerEl) skippedContainerEl.hidden = true;
   if (skippedListEl) skippedListEl.innerHTML = '';
   if (pdfControlsEl) pdfControlsEl.hidden = true;
@@ -1691,11 +1936,12 @@ async function openFetchScreen() {
   let results = [];
   let skipped = [];
 
-  if (currentSource === 'zip') {
-    // ZIP flow: in-memory decoding with TextDecoder, no network fetch
+  if (currentSource === 'zip' || currentSource === 'files') {
+    // In-memory flow (ZIP & Uploaded files): decode with TextDecoder, no network fetch
+    const contentsMap = (currentSource === 'files') ? uploadedFileContents : zipFileContents;
     let completed = 0;
     for (const file of orderedFiles) {
-      const uint8 = zipFileContents.get(file.path);
+      const uint8 = contentsMap.get(file.path);
       let isBinary = false;
       let text = '';
 
@@ -1850,25 +2096,30 @@ function renderMarkdownPreview(markdownText, filePath) {
     } else if (originalSrc.startsWith('data:')) {
       // Keep data URL src
     } else if (originalSrc) {
-      const cleanTarget = originalSrc.split('?')[0].split('#')[0];
-      const resolvedPath = resolveRelativePath(filePath, cleanTarget);
-
-      if (currentSource === 'github') {
-        const owner = currentOwner || window.currentOwner || '';
-        const repo = currentRepo || window.currentRepo || '';
-        const branch = currentBranch || window.currentBranch || 'main';
-        const encoded = resolvedPath.split('/').map(encodeURIComponent).join('/');
-        img.src = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${encoded}`;
+      if (currentSource === 'files') {
+        // Relative images from uploaded files cannot be resolved, so remove them
+        img.remove();
       } else {
-        // ZIP projects: look up in zipFileContents
-        const extMatch = resolvedPath.match(/\.([a-zA-Z0-9]+)$/);
-        const ext = extMatch ? extMatch[1].toLowerCase() : '';
-        const supported = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
-        if (supported.includes(ext) && zipFileContents.has(resolvedPath)) {
-          const uint8 = zipFileContents.get(resolvedPath);
-          img.src = uint8ArrayToDataUrl(uint8, ext);
+        const cleanTarget = originalSrc.split('?')[0].split('#')[0];
+        const resolvedPath = resolveRelativePath(filePath, cleanTarget);
+
+        if (currentSource === 'github') {
+          const owner = currentOwner || window.currentOwner || '';
+          const repo = currentRepo || window.currentRepo || '';
+          const branch = currentBranch || window.currentBranch || 'main';
+          const encoded = resolvedPath.split('/').map(encodeURIComponent).join('/');
+          img.src = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${encoded}`;
         } else {
-          img.remove();
+          // ZIP projects: look up in zipFileContents
+          const extMatch = resolvedPath.match(/\.([a-zA-Z0-9]+)$/);
+          const ext = extMatch ? extMatch[1].toLowerCase() : '';
+          const supported = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+          if (supported.includes(ext) && zipFileContents.has(resolvedPath)) {
+            const uint8 = zipFileContents.get(resolvedPath);
+            img.src = uint8ArrayToDataUrl(uint8, ext);
+          } else {
+            img.remove();
+          }
         }
       }
     } else {
@@ -2073,7 +2324,10 @@ async function printDocument(mode) {
   let projectName = '';
   let branchName = '';
 
-  if (currentSource === 'zip') {
+  if (currentSource === 'files') {
+    projectName = 'Uploaded files';
+    branchName = ''; // Hide branch line for uploaded files
+  } else if (currentSource === 'zip') {
     projectName = (currentZipFileName || 'Project').replace(/\.zip$/i, '');
     branchName = ''; // Hide branch line for ZIP projects
   } else {
@@ -2180,6 +2434,17 @@ async function handleLoad(e) {
 
   const { owner, repo } = parsed;
   readmePreviewModes.clear();
+
+  // Clear other sources
+  zipFileContents.clear();
+  currentZipFileName = '';
+  if (zipFileInput) zipFileInput.value = '';
+  chosenFiles = [];
+  window.chosenFiles = chosenFiles;
+  uploadedFileContents.clear();
+  if (filesInput) filesInput.value = '';
+  renderChosenFilesList();
+
   currentSource = 'github';
   currentOwner = owner;
   currentRepo = repo;

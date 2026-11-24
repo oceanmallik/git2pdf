@@ -194,6 +194,42 @@ a:hover {
   gap: var(--space-4);
 }
 
+.nav-star-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--text-12);
+  font-weight: var(--weight-500);
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.nav-star-link:hover {
+  background-color: var(--bg-card);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.nav-star-link .nav-link-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.5;
+  color: var(--text-secondary);
+}
+
+.nav-star-icon {
+  color: #fbbf24;
+  fill: #fbbf24;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
 .nav-link {
   font-size: var(--text-14);
   font-weight: var(--weight-500);
@@ -797,16 +833,109 @@ input[type="checkbox"] {
   border-top: 1px solid var(--border);
 }
 
-.github-login-container {
-  margin-bottom: var(--space-4);
+.auth-header {
+  margin-bottom: var(--space-3);
 }
 
-.auth-divider {
+.auth-header-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-12);
+  font-weight: var(--weight-500);
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.auth-info-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.auth-header-desc {
   font-size: var(--text-12);
   color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* One-line Auth Row */
+.auth-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   margin-top: var(--space-2);
 }
 
+.auth-row:has(.github-login-container[hidden]) {
+  display: none !important;
+}
+
+.github-login-container {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.github-login-container[hidden] {
+  display: none !important;
+}
+
+.auth-login-btn {
+  padding: 6px var(--space-3);
+  font-size: var(--text-12);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.auth-divider-text {
+  font-size: var(--text-12);
+  color: var(--text-muted);
+  font-weight: var(--weight-500);
+  flex-shrink: 0;
+}
+
+.manual-token-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.manual-token-container[hidden] {
+  display: none !important;
+}
+
+.token-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.token-input-wrap input[type="password"] {
+  width: 100%;
+  padding: 6px var(--space-3);
+  padding-right: 64px;
+  font-size: var(--text-12);
+}
+
+.token-help-btn {
+  position: absolute;
+  right: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.token-help-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-elevated);
+  text-decoration: none;
+}
+
+/* Logged in container */
 .github-logged-in-container {
   display: flex;
   align-items: center;
@@ -816,19 +945,66 @@ input[type="checkbox"] {
   background-color: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
-.github-logged-in-container[hidden],
-.github-login-container[hidden],
-.manual-token-container[hidden] {
+.github-logged-in-container[hidden] {
   display: none !important;
 }
 
+.logged-in-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent);
+}
+
 .logged-in-text {
-  font-size: var(--text-14);
+  font-size: var(--text-12);
   font-weight: var(--weight-500);
+  color: var(--text-primary);
+}
+
+/* Privacy Guarantee Banner */
+.auth-privacy-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-12);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.auth-privacy-banner .privacy-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
   color: var(--text-secondary);
+}
+
+.auth-privacy-banner a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-privacy-banner a:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 540px) {
+  .auth-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .auth-divider-text {
+    text-align: center;
+  }
+  .auth-login-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* Status Line */

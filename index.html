@@ -53,6 +53,24 @@
     </form>
 
     <div id="status" class="status-line" role="status" aria-live="polite"></div>
+
+    <div id="tree-container" class="tree-container" hidden>
+      <div class="tree-toolbar">
+        <div class="tree-actions">
+          <button type="button" id="select-all-btn">Select all</button>
+          <button type="button" id="deselect-all-btn">Deselect all</button>
+        </div>
+      </div>
+
+      <div id="file-tree" class="file-tree" role="tree"></div>
+
+      <div class="tree-footer">
+        <div id="selection-summary" class="selection-summary">
+          <span id="selected-count">0</span> <span id="selected-label">files selected</span>
+        </div>
+        <button type="button" id="next-btn" disabled>Next</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

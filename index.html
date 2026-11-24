@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Source+Code+Pro:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 </head>
@@ -15,15 +15,17 @@
   <!-- Header / Navbar -->
   <header class="site-header">
     <div class="header-inner">
-      <a href="#" class="header-brand" aria-label="git2pdf homepage">
-        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-          <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
-          <path d="M10 9H8"/>
-          <path d="M16 13H8"/>
-          <path d="M16 17H8"/>
-        </svg>
-        <span class="brand-title">git2pdf</span>
+      <a href="#" class="header-brand" aria-label="GIT2PDF homepage">
+        <div class="brand-icon-wrap">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+            <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+            <path d="M10 9H8"/>
+            <path d="M16 13H8"/>
+            <path d="M16 17H8"/>
+          </svg>
+        </div>
+        <span class="brand-title">GIT2PDF</span>
         <span class="badge">v1.0</span>
       </a>
       <nav class="header-nav">
@@ -370,14 +372,16 @@
 
       </div>
     </section>
-
-    <!-- Site Footer -->
-    <footer class="site-footer">
-      <p class="footer-text">
-        git2pdf. Built by <a href="https://github.com/oceanmallik" target="_blank" rel="noopener noreferrer" class="footer-author-link">@oceanmallik</a> on GitHub.
-      </p>
-    </footer>
   </main>
+
+  <!-- Site Footer (Full-width edge-to-edge separation line) -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p class="footer-text">
+        GIT2PDF. Built by <a href="https://github.com/oceanmallik" target="_blank" rel="noopener noreferrer" class="footer-author-link">@oceanmallik</a> on GitHub.
+      </p>
+    </div>
+  </footer>
 
   <!-- Print-ready document view (hidden on screen, visible during window.print()) -->
   <div id="print-view" class="print-view" aria-hidden="true"></div>

@@ -1103,8 +1103,6 @@ function renderPrintHtml(repoName, branch, files) {
   }
   html += '</ol>';
   html += '</div>';
-  // URL shown at the bottom of the cover page
-  html += '<div class="cover-url"><a href="https://git2pdf.devs.surf/">https://git2pdf.devs.surf/</a></div>';
   html += '</div>';
 
   // 2. Files flow continuously one after another, separated by ~8mm gap

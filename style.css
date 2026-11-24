@@ -664,11 +664,7 @@ input[type="checkbox"] {
 .cover-page {
   page-break-after: always;
   break-after: page;
-  box-sizing: border-box;
-  min-height: 250mm;
-  display: flex;
-  flex-direction: column;
-  padding: 10mm 0 0 0;
+  padding: 10mm 0 20mm 0;
 }
 
 .cover-repo-name {
@@ -684,10 +680,6 @@ input[type="checkbox"] {
   margin-bottom: 12mm;
   line-height: 1.6;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-.cover-toc {
-  flex: 1;
 }
 
 .cover-toc h2 {
@@ -707,19 +699,6 @@ input[type="checkbox"] {
 
 .toc-item {
   word-break: break-all;
-}
-
-.cover-url {
-  margin-top: auto;
-  padding-top: 10mm;
-  font-family: var(--code-font, 'JetBrains Mono', monospace);
-  font-size: 8pt;
-  color: var(--footer-color, #57606a);
-}
-
-.cover-url a {
-  color: inherit;
-  text-decoration: none;
 }
 
 /* File Sections: continuous flow separated by ~8mm gap */
@@ -868,11 +847,6 @@ input[type="checkbox"] {
 .bw-mode * {
   color: #000000 !important;
   background-color: transparent !important;
-}
-
-.bw-mode .cover-url,
-.bw-mode .cover-url a {
-  color: #000000 !important;
 }
 
 /* Keywords: bold */

@@ -200,6 +200,7 @@ const githubLoginBtn = document.getElementById('github-login-btn');
 const githubLoggedInContainer = document.getElementById('github-logged-in-container');
 const githubLogoutBtn = document.getElementById('github-logout-btn');
 const manualTokenContainer = document.getElementById('manual-token-container');
+const privateRepoOption = document.getElementById('private-repo-option');
 
 // DOM Elements: ZIP Dropzone
 const zipDropzone = document.getElementById('zip-dropzone');
@@ -280,12 +281,14 @@ function updateAuthUI() {
     if (githubLoginContainer) githubLoginContainer.hidden = true;
     if (githubLoggedInContainer) githubLoggedInContainer.hidden = false;
     if (manualTokenContainer) manualTokenContainer.hidden = true;
+    if (privateRepoOption) privateRepoOption.hidden = false;
     currentToken = token;
     window.currentToken = currentToken;
   } else {
     if (githubLoginContainer) githubLoginContainer.hidden = false;
     if (githubLoggedInContainer) githubLoggedInContainer.hidden = true;
     if (manualTokenContainer) manualTokenContainer.hidden = false;
+    if (privateRepoOption) privateRepoOption.hidden = true;
     if (tokenInput) {
       tokenInput.value = token;
     }

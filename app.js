@@ -1088,7 +1088,7 @@ if (fetchBackBtn) {
 function renderPrintHtml(repoName, branch, files) {
   let html = '';
 
-  // 1. Cover page
+  // 1. Cover page (keeps its own page, first file starts after it)
   html += '<div class="cover-page">';
   html += `<h1 class="cover-repo-name">${escapeHtml(repoName)}</h1>`;
   html += '<div class="cover-meta">';
@@ -1103,23 +1103,43 @@ function renderPrintHtml(repoName, branch, files) {
   }
   html += '</ol>';
   html += '</div>';
+  // URL shown at the bottom of the cover page
+  html += '<div class="cover-url"><a href="https://git2pdf.devs.surf/">https://git2pdf.devs.surf/</a></div>';
   html += '</div>';
 
-  // 2. Each file starts on a new page with header bar and code lines
+  // 2. Files flow continuously one after another, separated by ~8mm gap
   for (const f of files) {
     html += '<div class="file-section">';
+    html += '<div class="file-header-group">';
     html += '<div class="file-header-bar">';
     html += `<span class="file-header-path">${escapeHtml(f.path)}</span>`;
     html += `<span class="file-header-lines">${f.lines.length} lines</span>`;
     html += '</div>';
+
+    // Keep at least 3 lines of code with the header bar
+    const firstLines = f.lines.slice(0, 3);
+    const restLines = f.lines.slice(3);
+
     html += '<div class="file-code">';
-    f.lines.forEach((lineHtml, idx) => {
+    firstLines.forEach((lineHtml, idx) => {
       const lineNum = idx + 1;
       const content = lineHtml || '&#8203;';
       html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
     });
     html += '</div>';
-    html += '</div>';
+    html += '</div>'; // close file-header-group
+
+    if (restLines.length > 0) {
+      html += '<div class="file-code">';
+      restLines.forEach((lineHtml, idx) => {
+        const lineNum = idx + 4;
+        const content = lineHtml || '&#8203;';
+        html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
+      });
+      html += '</div>';
+    }
+
+    html += '</div>'; // close file-section
   }
 
   return html;
@@ -1134,11 +1154,46 @@ async function printDocument(mode) {
   const fontSizeSelect = fontSizeSelectEl || document.getElementById('font-size-select');
   const chosenFont = fontSelect ? fontSelect.value : "'JetBrains Mono', monospace";
   const chosenSize = fontSizeSelect ? fontSizeSelect.value : '9pt';
+  const footerColor = (mode === 'bw') ? '#000000' : '#57606a';
+
+  // Apply to document root for @page margin boxes
+  if (document.documentElement && document.documentElement.style) {
+    document.documentElement.style.setProperty('--code-font', chosenFont);
+    document.documentElement.style.setProperty('--code-font-size', chosenSize);
+    document.documentElement.style.setProperty('--footer-color', footerColor);
+  }
 
   // Apply mode
   printViewEl.className = 'print-view ' + (mode === 'bw' ? 'bw-mode' : 'colour-mode');
   printViewEl.style.setProperty('--code-font', chosenFont);
   printViewEl.style.setProperty('--code-font-size', chosenSize);
+  printViewEl.style.setProperty('--footer-color', footerColor);
+
+  // Dynamic @page style tag for browser engines with strict @page margin box styling
+  let pageStyle = document.getElementById('print-page-style');
+  if (!pageStyle) {
+    pageStyle = document.createElement('style');
+    pageStyle.id = 'print-page-style';
+    document.head.appendChild(pageStyle);
+  }
+  pageStyle.textContent = `
+    @page {
+      size: A4;
+      margin: 15mm 15mm 20mm 15mm;
+      @bottom-left {
+        content: "https://git2pdf.devs.surf/";
+        font-family: ${chosenFont};
+        font-size: 8pt;
+        color: ${footerColor};
+      }
+      @bottom-center {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: ${chosenFont};
+        font-size: 8pt;
+        color: ${footerColor};
+      }
+    }
+  `;
 
   // Render print-ready document HTML
   const owner = currentOwner || window.currentOwner || '';

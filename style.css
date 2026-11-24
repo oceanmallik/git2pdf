@@ -1294,6 +1294,53 @@ input[type="checkbox"] {
   font-family: var(--font-mono);
   font-size: 13px;
   word-break: break-all;
+  margin-right: var(--space-2);
+}
+
+/* README Mode Segmented Control */
+.readme-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  padding: 2px;
+  margin-left: auto;
+  gap: 2px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.readme-mode-btn {
+  height: 22px;
+  line-height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  border: none;
+  cursor: pointer;
+  background-color: transparent;
+  color: var(--text-muted);
+  transition: all 150ms ease;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.readme-mode-btn:hover:not(.selected) {
+  color: var(--text-body);
+  background-color: var(--bg-elevated);
+}
+
+.readme-mode-btn.selected {
+  background-color: var(--text-primary);
+  color: var(--text-inverse);
+  font-weight: 600;
+  cursor: default;
 }
 
 .sortable-ghost {
@@ -1827,4 +1874,229 @@ input[type="checkbox"] {
 
 .bw-mode .cover-toc h2 {
   border-bottom: 1px solid #000000 !important;
+}
+
+/* ==========================================================================
+   README PREVIEW STYLES (Page Breaks, Typography & Print Modes)
+   ========================================================================== */
+.preview-section {
+  break-before: page;
+  page-break-before: always;
+}
+
+.file-section.after-preview {
+  break-before: page;
+  page-break-before: always;
+}
+
+.preview-section h1,
+.preview-section h2,
+.preview-section h3,
+.preview-section h4,
+.preview-section h5,
+.preview-section h6 {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.preview-section tr,
+.preview-section img,
+.preview-section blockquote,
+.preview-section li {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.preview-section p {
+  orphans: 3;
+  widows: 3;
+}
+
+.preview-section pre {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.readme-preview-content {
+  font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.readme-preview-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.readme-preview-content code,
+.readme-preview-content pre {
+  font-family: var(--code-font, 'JetBrains Mono', monospace);
+  font-size: calc(var(--code-font-size, 9pt) * 0.9);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.readme-preview-content pre {
+  padding: 8px 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 10px 0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.readme-preview-content code {
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+
+.readme-preview-content pre code {
+  padding: 0;
+  border: none;
+  background: transparent !important;
+  font-size: inherit;
+}
+
+.readme-preview-content p,
+.readme-preview-content ul,
+.readme-preview-content ol,
+.readme-preview-content blockquote,
+.readme-preview-content table {
+  margin: 8px 0;
+}
+
+.readme-preview-content ul,
+.readme-preview-content ol {
+  padding-left: 24px;
+}
+
+.readme-preview-content li {
+  margin: 3px 0;
+}
+
+.readme-preview-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.readme-preview-content th,
+.readme-preview-content td {
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.readme-preview-content blockquote {
+  padding: 4px 12px;
+  margin: 10px 0;
+}
+
+.readme-preview-content h1,
+.readme-preview-content h2,
+.readme-preview-content h3,
+.readme-preview-content h4,
+.readme-preview-content h5,
+.readme-preview-content h6 {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.readme-preview-content h1 {
+  font-size: 16pt;
+  padding-bottom: 4px;
+}
+
+.readme-preview-content h2 {
+  font-size: 13pt;
+  padding-bottom: 3px;
+}
+
+.readme-preview-content h3 {
+  font-size: 11pt;
+}
+
+/* Colour Mode */
+.colour-mode .readme-preview-content {
+  color: #1f2328;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.colour-mode .readme-preview-content a {
+  color: #0969da;
+}
+
+.colour-mode .readme-preview-content code:not(pre code) {
+  background-color: #f6f8fa;
+  border: 1px solid #d0d7de;
+}
+
+.colour-mode .readme-preview-content pre {
+  background-color: #f6f8fa;
+  border: 1px solid #d0d7de;
+}
+
+.colour-mode .readme-preview-content table,
+.colour-mode .readme-preview-content th,
+.colour-mode .readme-preview-content td {
+  border: 1px solid #d0d7de;
+}
+
+.colour-mode .readme-preview-content blockquote {
+  border-left: 3px solid #d0d7de;
+  color: #59636e;
+}
+
+.colour-mode .readme-preview-content h1,
+.colour-mode .readme-preview-content h2 {
+  border-bottom: 1px solid #d0d7de;
+}
+
+/* Black & White Mode */
+.bw-mode .readme-preview-content {
+  color: #000000 !important;
+  background-color: transparent !important;
+}
+
+.bw-mode .readme-preview-content * {
+  color: #000000 !important;
+  background-color: transparent !important;
+}
+
+.bw-mode .readme-preview-content a {
+  text-decoration: underline !important;
+  color: #000000 !important;
+}
+
+.bw-mode .readme-preview-content code:not(pre code) {
+  background: transparent !important;
+  border: none !important;
+}
+
+.bw-mode .readme-preview-content pre {
+  background: transparent !important;
+  border: 1px solid #000000 !important;
+}
+
+.bw-mode .readme-preview-content table,
+.bw-mode .readme-preview-content th,
+.bw-mode .readme-preview-content td {
+  border: 1px solid #000000 !important;
+}
+
+.bw-mode .readme-preview-content blockquote {
+  border-left: 2px solid #000000 !important;
+}
+
+.bw-mode .readme-preview-content h1,
+.bw-mode .readme-preview-content h2 {
+  border-bottom: 1px solid #000000 !important;
+}
+
+.bw-mode .readme-preview-content img {
+  filter: grayscale(1) !important;
 }

@@ -15,6 +15,68 @@ window.orderedFiles = orderedFiles;
 var processedFiles = [];
 window.processedFiles = processedFiles;
 
+// README preview modes: filePath -> 'raw' | 'preview'
+var readmePreviewModes = new Map();
+window.readmePreviewModes = readmePreviewModes;
+
+// Helper: Check if a file counts as a README
+function isReadmeFile(filePath) {
+  if (!filePath || typeof filePath !== 'string') return false;
+  const fileName = filePath.split('/').pop().toLowerCase();
+  return fileName === 'readme.md' || fileName === 'readme.markdown';
+}
+
+// Helper: Resolve relative paths for images in markdown
+function resolveRelativePath(baseFilePath, targetPath) {
+  if (!targetPath) return '';
+  let cleanTarget = targetPath.replace(/\\/g, '/');
+  if (cleanTarget.startsWith('/')) {
+    cleanTarget = cleanTarget.replace(/^\/+/, '');
+    const stack = [];
+    for (const seg of cleanTarget.split('/')) {
+      if (seg === '' || seg === '.') continue;
+      if (seg === '..') {
+        if (stack.length > 0) stack.pop();
+      } else {
+        stack.push(seg);
+      }
+    }
+    return stack.join('/');
+  }
+  const baseParts = baseFilePath.split('/');
+  baseParts.pop();
+  for (const seg of cleanTarget.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      if (baseParts.length > 0) baseParts.pop();
+    } else {
+      baseParts.push(seg);
+    }
+  }
+  return baseParts.join('/');
+}
+
+// Helper: Convert Uint8Array to base64 data URL
+function uint8ArrayToDataUrl(uint8, ext) {
+  const mimeMap = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml'
+  };
+  const mime = mimeMap[(ext || '').toLowerCase()] || 'image/png';
+  let binary = '';
+  const len = uint8.byteLength;
+  const chunkSize = 8192;
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = uint8.subarray(i, Math.min(i + chunkSize, len));
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
 // Current repo / project info
 var currentSource = 'github'; // 'github' or 'zip'
 var currentOwner = '';
@@ -447,6 +509,8 @@ function clearState() {
   window.orderedFiles = orderedFiles;
   window.processedFiles = processedFiles;
 
+  readmePreviewModes.clear();
+
   selectedFilePaths.clear();
   currentTreeRoot = null;
   allFileNodes = [];
@@ -712,6 +776,7 @@ async function handleZipFile(file) {
 
   // Build file list and keep each file's content in memory
   zipFileContents.clear();
+  readmePreviewModes.clear();
   const fileList = [];
   currentSource = 'zip';
   currentZipFileName = file.name;
@@ -1244,6 +1309,56 @@ function renderOrderListDOM() {
 
     li.appendChild(handle);
     li.appendChild(pathSpan);
+
+    // README Mode Toggle Control
+    if (isReadmeFile(file.path)) {
+      const currentMode = readmePreviewModes.get(file.path) || 'raw';
+      readmePreviewModes.set(file.path, currentMode);
+
+      const toggle = document.createElement('div');
+      toggle.className = 'readme-mode-toggle';
+      toggle.setAttribute('role', 'radiogroup');
+      toggle.setAttribute('aria-label', `View mode for ${file.path}`);
+
+      const rawBtn = document.createElement('button');
+      rawBtn.type = 'button';
+      rawBtn.className = 'readme-mode-btn' + (currentMode === 'raw' ? ' selected' : '');
+      rawBtn.setAttribute('role', 'radio');
+      rawBtn.setAttribute('aria-checked', String(currentMode === 'raw'));
+      rawBtn.textContent = 'Raw code';
+
+      const previewBtn = document.createElement('button');
+      previewBtn.type = 'button';
+      previewBtn.className = 'readme-mode-btn' + (currentMode === 'preview' ? ' selected' : '');
+      previewBtn.setAttribute('role', 'radio');
+      previewBtn.setAttribute('aria-checked', String(currentMode === 'preview'));
+      previewBtn.textContent = 'Preview';
+
+      rawBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (readmePreviewModes.get(file.path) === 'raw') return;
+        readmePreviewModes.set(file.path, 'raw');
+        rawBtn.classList.add('selected');
+        rawBtn.setAttribute('aria-checked', 'true');
+        previewBtn.classList.remove('selected');
+        previewBtn.setAttribute('aria-checked', 'false');
+      });
+
+      previewBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (readmePreviewModes.get(file.path) === 'preview') return;
+        readmePreviewModes.set(file.path, 'preview');
+        previewBtn.classList.add('selected');
+        previewBtn.setAttribute('aria-checked', 'true');
+        rawBtn.classList.remove('selected');
+        rawBtn.setAttribute('aria-checked', 'false');
+      });
+
+      toggle.appendChild(rawBtn);
+      toggle.appendChild(previewBtn);
+      li.appendChild(toggle);
+    }
+
     fragment.appendChild(li);
   }
   orderListEl.appendChild(fragment);
@@ -1279,6 +1394,8 @@ function initSortable() {
   if (typeof Sortable !== 'undefined') {
     sortableInstance = new Sortable(orderListEl, {
       handle: '.drag-handle',
+      filter: '.readme-mode-toggle, .readme-mode-toggle *',
+      preventOnFilter: false,
       animation: 150,
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
@@ -1500,11 +1617,15 @@ async function fetchAndProcessFile(file) {
   }
 
   const normalized = normalizeText(text);
+  const isPreview = isReadmeFile(path) && readmePreviewModes.get(path) === 'preview';
   const language = detectLanguage(path);
-  const highlightedHtml = highlightCode(normalized, language);
-  const lines = splitHighlightedIntoLines(highlightedHtml);
+  let lines = [];
+  if (!isPreview) {
+    const highlightedHtml = highlightCode(normalized, language);
+    lines = splitHighlightedIntoLines(highlightedHtml);
+  }
 
-  return { skipped: false, path, language, lines };
+  return { skipped: false, path, language, lines, originalText: normalized };
 }
 
 // Concurrent worker pool for GitHub flow: fetch 5 at a time
@@ -1597,10 +1718,14 @@ async function openFetchScreen() {
         skipped.push({ path: file.path, reason: 'Looks binary' });
       } else {
         const normalized = normalizeText(text);
+        const isPreview = isReadmeFile(file.path) && readmePreviewModes.get(file.path) === 'preview';
         const language = detectLanguage(file.path);
-        const highlightedHtml = highlightCode(normalized, language);
-        const lines = splitHighlightedIntoLines(highlightedHtml);
-        results.push({ path: file.path, language, lines });
+        let lines = [];
+        if (!isPreview) {
+          const highlightedHtml = highlightCode(normalized, language);
+          lines = splitHighlightedIntoLines(highlightedHtml);
+        }
+        results.push({ path: file.path, language, lines, originalText: normalized });
       }
 
       completed++;
@@ -1680,6 +1805,126 @@ if (fetchStartOverBtn) {
 // Final Step: Print-Ready Document & PDF Export
 // ==========================================
 
+// Render markdown to sanitized HTML with resolved links and images
+function renderMarkdownPreview(markdownText, filePath) {
+  if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+    throw new Error('Markdown preview libraries not loaded');
+  }
+
+  // Use marked with GitHub-flavoured markdown (tables, task lists, strikethrough)
+  const rawHtml = marked.parse(markdownText || '', {
+    gfm: true,
+    breaks: false
+  });
+
+  // Sanitize with DOMPurify forbidding iframe, video, script, style, form tags
+  const cleanHtml = DOMPurify.sanitize(rawHtml, {
+    FORBID_TAGS: ['iframe', 'video', 'script', 'style', 'form']
+  });
+
+  const container = document.createElement('div');
+  container.innerHTML = cleanHtml;
+
+  // Process links: keep absolute http(s) links. For any other href (relative, #anchor), remove href and keep text
+  const links = container.querySelectorAll('a');
+  for (const a of links) {
+    const href = a.getAttribute('href');
+    if (href) {
+      if (/^https?:\/\//i.test(href)) {
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+      } else {
+        a.removeAttribute('href');
+      }
+    }
+  }
+
+  // Process images
+  const images = container.querySelectorAll('img');
+  for (const img of images) {
+    const originalSrc = (img.getAttribute('src') || '').trim();
+    img.setAttribute('onerror', 'this.remove()');
+
+    if (/^https?:\/\//i.test(originalSrc)) {
+      // Keep absolute http(s) URLs as is
+    } else if (originalSrc.startsWith('data:')) {
+      // Keep data URL src
+    } else if (originalSrc) {
+      const cleanTarget = originalSrc.split('?')[0].split('#')[0];
+      const resolvedPath = resolveRelativePath(filePath, cleanTarget);
+
+      if (currentSource === 'github') {
+        const owner = currentOwner || window.currentOwner || '';
+        const repo = currentRepo || window.currentRepo || '';
+        const branch = currentBranch || window.currentBranch || 'main';
+        const encoded = resolvedPath.split('/').map(encodeURIComponent).join('/');
+        img.src = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${encoded}`;
+      } else {
+        // ZIP projects: look up in zipFileContents
+        const extMatch = resolvedPath.match(/\.([a-zA-Z0-9]+)$/);
+        const ext = extMatch ? extMatch[1].toLowerCase() : '';
+        const supported = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+        if (supported.includes(ext) && zipFileContents.has(resolvedPath)) {
+          const uint8 = zipFileContents.get(resolvedPath);
+          img.src = uint8ArrayToDataUrl(uint8, ext);
+        } else {
+          img.remove();
+        }
+      }
+    } else {
+      img.remove();
+    }
+  }
+
+  // Fenced code blocks: run highlight.js on pre code
+  const codeBlocks = container.querySelectorAll('pre code');
+  for (const block of codeBlocks) {
+    if (typeof hljs !== 'undefined') {
+      try {
+        hljs.highlightElement(block);
+      } catch (_) {}
+    }
+  }
+
+  return container.innerHTML;
+}
+
+// Wait for document fonts and all preview images before window.print() (up to 8s)
+function waitForPreviewImages(container, timeoutMs = 8000) {
+  if (!container) return Promise.resolve();
+  const images = Array.from(container.querySelectorAll('.preview-section img'));
+  if (images.length === 0) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    let finished = false;
+    const timer = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        resolve();
+      }
+    }, timeoutMs);
+
+    let remaining = images.length;
+    function checkDone() {
+      remaining--;
+      if (remaining <= 0 && !finished) {
+        finished = true;
+        clearTimeout(timer);
+        resolve();
+      }
+    }
+
+    for (const img of images) {
+      if (img.complete) {
+        checkDone();
+      } else {
+        img.addEventListener('load', checkDone, { once: true });
+        img.addEventListener('error', checkDone, { once: true });
+      }
+    }
+  });
+}
+
 // Build the print-ready HTML
 function renderPrintHtml(repoName, branch, files) {
   let html = '';
@@ -1703,39 +1948,72 @@ function renderPrintHtml(repoName, branch, files) {
   html += '</div>';
   html += '</div>';
 
-  // 2. Files flow continuously one after another, separated by ~8mm gap
+  // 2. Files flow
+  let prevWasPreview = false;
+
   for (const f of files) {
-    html += '<div class="file-section">';
-    html += '<div class="file-header-group">';
-    html += '<div class="file-header-bar">';
-    html += `<span class="file-header-path">${escapeHtml(f.path)}</span>`;
-    html += `<span class="file-header-lines">${f.lines.length} lines</span>`;
-    html += '</div>';
+    let isPreview = isReadmeFile(f.path) && readmePreviewModes.get(f.path) === 'preview';
+    let previewHtml = '';
 
-    // Keep at least 3 lines of code with the header bar
-    const firstLines = f.lines.slice(0, 3);
-    const restLines = f.lines.slice(3);
+    if (isPreview) {
+      try {
+        previewHtml = renderMarkdownPreview(f.originalText || '', f.path);
+      } catch (_) {
+        // Silently fall back to Raw code for that file
+        isPreview = false;
+        if (!f.lines || f.lines.length === 0) {
+          const lang = f.language || detectLanguage(f.path);
+          const highlightedHtml = highlightCode(f.originalText || '', lang);
+          f.lines = splitHighlightedIntoLines(highlightedHtml);
+        }
+      }
+    }
 
-    html += '<div class="file-code">';
-    firstLines.forEach((lineHtml, idx) => {
-      const lineNum = idx + 1;
-      const content = lineHtml || '&#8203;';
-      html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
-    });
-    html += '</div>';
-    html += '</div>'; // close file-header-group
+    if (isPreview) {
+      html += '<div class="file-section preview-section">';
+      html += '<div class="file-header-group">';
+      html += '<div class="file-header-bar">';
+      html += `<span class="file-header-path">${escapeHtml(f.path)}</span>`;
+      html += '</div>';
+      html += '</div>'; // close file-header-group
 
-    if (restLines.length > 0) {
+      html += `<div class="readme-preview-content">${previewHtml}</div>`;
+      html += '</div>'; // close file-section preview-section
+      prevWasPreview = true;
+    } else {
+      const extraClass = prevWasPreview ? ' after-preview' : '';
+      html += `<div class="file-section${extraClass}">`;
+      html += '<div class="file-header-group">';
+      html += '<div class="file-header-bar">';
+      html += `<span class="file-header-path">${escapeHtml(f.path)}</span>`;
+      html += `<span class="file-header-lines">${f.lines ? f.lines.length : 0} lines</span>`;
+      html += '</div>';
+
+      const firstLines = (f.lines || []).slice(0, 3);
+      const restLines = (f.lines || []).slice(3);
+
       html += '<div class="file-code">';
-      restLines.forEach((lineHtml, idx) => {
-        const lineNum = idx + 4;
+      firstLines.forEach((lineHtml, idx) => {
+        const lineNum = idx + 1;
         const content = lineHtml || '&#8203;';
         html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
       });
       html += '</div>';
-    }
+      html += '</div>'; // close file-header-group
 
-    html += '</div>'; // close file-section
+      if (restLines.length > 0) {
+        html += '<div class="file-code">';
+        restLines.forEach((lineHtml, idx) => {
+          const lineNum = idx + 4;
+          const content = lineHtml || '&#8203;';
+          html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
+        });
+        html += '</div>';
+      }
+
+      html += '</div>'; // close file-section
+      prevWasPreview = false;
+    }
   }
 
   return html;
@@ -1807,12 +2085,13 @@ async function printDocument(mode) {
 
   printViewEl.innerHTML = renderPrintHtml(projectName, branchName, window.processedFiles);
 
-  // Wait for Google Fonts before printing
-  if (document.fonts && document.fonts.ready) {
-    try {
-      await document.fonts.ready;
-    } catch (_) {}
-  }
+  // Wait for Google Fonts and preview images before printing (max 8s)
+  const fontPromise = (document.fonts && document.fonts.ready)
+    ? document.fonts.ready.catch(() => {})
+    : Promise.resolve();
+  const imagesPromise = waitForPreviewImages(printViewEl, 8000);
+
+  await Promise.all([fontPromise, imagesPromise]);
 
   // Open browser print dialog so user saves as PDF
   window.print();
@@ -1900,6 +2179,7 @@ async function handleLoad(e) {
   }
 
   const { owner, repo } = parsed;
+  readmePreviewModes.clear();
   currentSource = 'github';
   currentOwner = owner;
   currentRepo = repo;

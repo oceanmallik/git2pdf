@@ -525,3 +525,338 @@ input[type="checkbox"] {
 .skipped-item strong {
   color: #24292f;
 }
+
+/* PDF Controls (Final Step) */
+.pdf-controls {
+  padding: 16px;
+  margin: 0 16px 16px 16px;
+  background-color: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+}
+
+.pdf-controls[hidden] {
+  display: none !important;
+}
+
+.pdf-controls-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.pdf-field {
+  flex: 1;
+}
+
+.pdf-field label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #24292f;
+}
+
+.pdf-field select {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1f2328;
+  background-color: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+.pdf-field select:focus {
+  border-color: #0969da;
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+}
+
+.pdf-buttons-row {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-pdf-colour {
+  background-color: #1f883d;
+  color: #ffffff;
+  border-color: rgba(27, 31, 36, 0.15);
+  font-weight: 600;
+}
+
+.btn-pdf-colour:hover:not(:disabled) {
+  background-color: #1a7f37;
+}
+
+.btn-pdf-bw {
+  background-color: #24292f;
+  color: #ffffff;
+  border-color: rgba(27, 31, 36, 0.15);
+  font-weight: 600;
+}
+
+.btn-pdf-bw:hover:not(:disabled) {
+  background-color: #1f2328;
+}
+
+/* ==========================================================================
+   PRINT STYLES & LAYOUT (Page A4, Margins, Header/Cover, Tokens)
+   ========================================================================== */
+
+@page {
+  size: A4;
+  margin: 15mm;
+  @bottom-center {
+    content: "Page " counter(page) " of " counter(pages);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 8pt;
+    color: #57606a;
+  }
+}
+
+@media screen {
+  .print-view {
+    display: none !important;
+  }
+}
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide the whole app UI in @media print */
+  .container {
+    display: none !important;
+  }
+
+  .print-view {
+    display: block !important;
+    width: 100% !important;
+    background-color: #ffffff !important;
+  }
+}
+
+/* Print View Document Structure */
+.print-view {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  line-height: 1.4;
+}
+
+/* Cover page */
+.cover-page {
+  page-break-after: always;
+  break-after: page;
+  padding: 10mm 0 20mm 0;
+}
+
+.cover-repo-name {
+  font-size: 26pt;
+  font-weight: 700;
+  margin-bottom: 6mm;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  word-break: break-all;
+}
+
+.cover-meta {
+  font-size: 11pt;
+  margin-bottom: 12mm;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.cover-toc h2 {
+  font-size: 13pt;
+  margin-bottom: 4mm;
+  padding-bottom: 2mm;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  border-bottom: 1px solid #d0d7de;
+}
+
+.toc-list {
+  padding-left: 24px;
+  font-family: var(--code-font, 'JetBrains Mono', monospace);
+  font-size: 9pt;
+  line-height: 1.6;
+}
+
+.toc-item {
+  word-break: break-all;
+}
+
+/* File Sections */
+.file-section {
+  page-break-before: always;
+  break-before: page;
+}
+
+.file-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  margin-bottom: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 9.5pt;
+  font-weight: 600;
+  border-bottom: 1px solid #d0d7de;
+}
+
+.file-header-path {
+  font-family: var(--code-font, 'JetBrains Mono', monospace);
+  word-break: break-all;
+}
+
+.file-header-lines {
+  font-size: 8.5pt;
+  color: #57606a;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.file-code {
+  font-family: var(--code-font, 'JetBrains Mono', monospace);
+  font-size: var(--code-font-size, 9pt);
+  line-height: 1.4;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+/* Code line and left gutter layout */
+.code-line {
+  display: flex;
+  align-items: flex-start;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  tab-size: 4;
+}
+
+.line-number {
+  flex-shrink: 0;
+  width: 4.2em;
+  text-align: right;
+  padding-right: 1em;
+  margin-right: 1em;
+  user-select: none;
+  -webkit-user-select: none;
+  color: var(--line-number-color, #8c959f);
+  border-right: var(--line-number-border, 1px solid transparent);
+}
+
+.line-content {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-all;
+  tab-size: 4;
+}
+
+/* ==========================================================================
+   COLOUR MODE: Light theme, exact colours
+   ========================================================================== */
+.print-view.colour-mode {
+  --hljs-text: #24292f;
+  --hljs-keyword: #8250df;       /* purple */
+  --hljs-string: #1a7f37;        /* green */
+  --hljs-comment: #6e7781;       /* gray */
+  --hljs-number: #0969da;        /* blue */
+  --hljs-function: #0550ae;      /* dark blue */
+  --line-number-color: #8c959f;
+  --line-number-border: 1px solid #e1e4e8;
+  color: var(--hljs-text);
+  background-color: #ffffff;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.colour-mode .hljs-keyword,
+.colour-mode .hljs-selector-tag,
+.colour-mode .hljs-built_in,
+.colour-mode .hljs-type {
+  color: var(--hljs-keyword);
+}
+
+.colour-mode .hljs-string,
+.colour-mode .hljs-addition,
+.colour-mode .hljs-attribute {
+  color: var(--hljs-string);
+}
+
+.colour-mode .hljs-comment,
+.colour-mode .hljs-quote {
+  color: var(--hljs-comment);
+}
+
+.colour-mode .hljs-number,
+.colour-mode .hljs-literal {
+  color: var(--hljs-number);
+}
+
+.colour-mode .hljs-title,
+.colour-mode .hljs-title\.function_,
+.colour-mode .hljs-function {
+  color: var(--hljs-function);
+}
+
+/* ==========================================================================
+   BLACK & WHITE MODE: Pure black text on white, style-based token distinctions
+   ========================================================================== */
+.print-view.bw-mode {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+.bw-mode * {
+  color: #000000 !important;
+  background-color: transparent !important;
+}
+
+/* Keywords: bold */
+.bw-mode .hljs-keyword,
+.bw-mode .hljs-selector-tag,
+.bw-mode .hljs-built_in,
+.bw-mode .hljs-type {
+  font-weight: bold !important;
+  font-style: normal !important;
+}
+
+/* Comments: italic */
+.bw-mode .hljs-comment,
+.bw-mode .hljs-quote {
+  font-style: italic !important;
+  font-weight: normal !important;
+}
+
+/* Strings: normal */
+.bw-mode .hljs-string,
+.bw-mode .hljs-addition,
+.bw-mode .hljs-attribute {
+  font-style: normal !important;
+  font-weight: normal !important;
+}
+
+/* Line numbers: light gray-free thin right border, gutter has no background */
+.bw-mode .line-number {
+  color: #000000 !important;
+  border-right: 1px solid #000000 !important;
+  background: transparent !important;
+}
+
+.bw-mode .file-header-bar {
+  border-bottom: 1px solid #000000 !important;
+}
+
+.bw-mode .file-header-lines {
+  color: #000000 !important;
+}
+
+.bw-mode .cover-toc h2 {
+  border-bottom: 1px solid #000000 !important;
+}

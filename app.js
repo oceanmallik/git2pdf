@@ -125,7 +125,7 @@ const sortOriginalBtn = document.getElementById('sort-original-btn');
 const orderBackBtn = document.getElementById('order-back-btn');
 const orderNextBtn = document.getElementById('order-next-btn');
 
-// DOM Elements: Step 4 (Content Fetching & Highlighting Screen)
+// DOM Elements: Step 4 (Content Fetching & PDF Export Screen)
 const fetchContainer = document.getElementById('fetch-container') || document.querySelector('.fetch-container');
 const progressTextEl = document.getElementById('progress-text');
 const progressBarFillEl = document.getElementById('progress-bar-fill');
@@ -134,6 +134,14 @@ const skippedContainerEl = document.getElementById('skipped-container');
 const skippedCountEl = document.getElementById('skipped-count');
 const skippedListEl = document.getElementById('skipped-list');
 const fetchBackBtn = document.getElementById('fetch-back-btn');
+const pdfControlsEl = document.getElementById('pdf-controls');
+const fontSelectEl = document.getElementById('font-select');
+const fontSizeSelectEl = document.getElementById('font-size-select');
+const pdfColourBtn = document.getElementById('pdf-colour-btn');
+const pdfBwBtn = document.getElementById('pdf-bw-btn');
+
+// DOM Elements: Print View
+const printViewEl = document.getElementById('print-view');
 
 // State
 var selectedFilePaths = new Set();
@@ -528,9 +536,13 @@ function createFileElement(fileNode) {
 }
 
 function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // Render the tree in Step 2
@@ -851,7 +863,6 @@ function isBinaryContent(text) {
   let controlChars = 0;
   for (let i = 0; i < sample.length; i++) {
     const code = sample.charCodeAt(i);
-    // Allow tab (9), newline (10), carriage return (13)
     if ((code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 65533) {
       controlChars++;
     }
@@ -1016,9 +1027,8 @@ async function openFetchScreen() {
   if (fetchStatusLineEl) fetchStatusLineEl.textContent = 'Starting download...';
   if (skippedContainerEl) skippedContainerEl.hidden = true;
   if (skippedListEl) skippedListEl.innerHTML = '';
+  if (pdfControlsEl) pdfControlsEl.hidden = true;
   if (fetchBackBtn) fetchBackBtn.disabled = true;
-
-  const skippedList = [];
 
   const { results, skipped } = await runConcurrentFetch(orderedFiles, 5, (completed, totalCount, lastPath) => {
     if (progressTextEl) {
@@ -1055,6 +1065,9 @@ async function openFetchScreen() {
   if (fetchBackBtn) {
     fetchBackBtn.disabled = false;
   }
+  if (pdfControlsEl) {
+    pdfControlsEl.hidden = false;
+  }
 
   console.log('Step 4 results ready in window.processedFiles:', window.processedFiles);
 }
@@ -1064,6 +1077,98 @@ if (fetchBackBtn) {
   fetchBackBtn.addEventListener('click', () => {
     if (fetchContainer) fetchContainer.hidden = true;
     if (orderContainer) orderContainer.hidden = false;
+  });
+}
+
+// ==========================================
+// Final Step: Print-Ready Document & PDF Export
+// ==========================================
+
+// Build the print-ready HTML
+function renderPrintHtml(repoName, branch, files) {
+  let html = '';
+
+  // 1. Cover page
+  html += '<div class="cover-page">';
+  html += `<h1 class="cover-repo-name">${escapeHtml(repoName)}</h1>`;
+  html += '<div class="cover-meta">';
+  html += `<div class="cover-meta-item"><strong>Branch:</strong> ${escapeHtml(branch)}</div>`;
+  html += `<div class="cover-meta-item"><strong>File count:</strong> ${files.length}</div>`;
+  html += '</div>';
+  html += '<div class="cover-toc">';
+  html += '<h2 class="toc-title">Table of Contents</h2>';
+  html += '<ol class="toc-list">';
+  for (const f of files) {
+    html += `<li class="toc-item">${escapeHtml(f.path)}</li>`;
+  }
+  html += '</ol>';
+  html += '</div>';
+  html += '</div>';
+
+  // 2. Each file starts on a new page with header bar and code lines
+  for (const f of files) {
+    html += '<div class="file-section">';
+    html += '<div class="file-header-bar">';
+    html += `<span class="file-header-path">${escapeHtml(f.path)}</span>`;
+    html += `<span class="file-header-lines">${f.lines.length} lines</span>`;
+    html += '</div>';
+    html += '<div class="file-code">';
+    f.lines.forEach((lineHtml, idx) => {
+      const lineNum = idx + 1;
+      const content = lineHtml || '&#8203;';
+      html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
+    });
+    html += '</div>';
+    html += '</div>';
+  }
+
+  return html;
+}
+
+// Generate print view and trigger window.print()
+async function printDocument(mode) {
+  if (!window.processedFiles || window.processedFiles.length === 0) return;
+  if (!printViewEl) return;
+
+  const fontSelect = fontSelectEl || document.getElementById('font-select');
+  const fontSizeSelect = fontSizeSelectEl || document.getElementById('font-size-select');
+  const chosenFont = fontSelect ? fontSelect.value : "'JetBrains Mono', monospace";
+  const chosenSize = fontSizeSelect ? fontSizeSelect.value : '9pt';
+
+  // Apply mode
+  printViewEl.className = 'print-view ' + (mode === 'bw' ? 'bw-mode' : 'colour-mode');
+  printViewEl.style.setProperty('--code-font', chosenFont);
+  printViewEl.style.setProperty('--code-font-size', chosenSize);
+
+  // Render print-ready document HTML
+  const owner = currentOwner || window.currentOwner || '';
+  const repo = currentRepo || window.currentRepo || '';
+  const branchName = currentBranch || window.currentBranch || 'main';
+  const repoFullName = (owner && repo) ? `${owner}/${repo}` : (repo || 'Repository');
+
+  printViewEl.innerHTML = renderPrintHtml(repoFullName, branchName, window.processedFiles);
+
+  // Wait for Google Fonts before printing
+  if (document.fonts && document.fonts.ready) {
+    try {
+      await document.fonts.ready;
+    } catch (_) {}
+  }
+
+  // Open browser print dialog so user saves as PDF
+  window.print();
+}
+
+// Bind PDF Export Buttons
+if (pdfColourBtn) {
+  pdfColourBtn.addEventListener('click', () => {
+    return printDocument('colour');
+  });
+}
+
+if (pdfBwBtn) {
+  pdfBwBtn.addEventListener('click', () => {
+    return printDocument('bw');
   });
 }
 

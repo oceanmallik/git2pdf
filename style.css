@@ -236,6 +236,15 @@ button:disabled {
   word-break: break-word;
 }
 
+.status-line a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.status-line a:hover {
+  opacity: 0.8;
+}
+
 .status-line.error {
   color: #cf222e;
 }
@@ -246,6 +255,50 @@ button:disabled {
 
 .status-line.loading {
   color: #57606a;
+}
+
+/* GitHub OAuth */
+.auth-section {
+  margin-bottom: 20px;
+}
+
+.github-login-container {
+  margin-bottom: 16px;
+}
+
+.auth-divider {
+  font-size: 12px;
+  color: #57606a;
+  margin-top: 10px;
+}
+
+.github-logged-in-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.github-logged-in-container[hidden],
+.github-login-container[hidden],
+.manual-token-container[hidden] {
+  display: none !important;
+}
+
+.logged-in-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2328;
+}
+
+#github-logout-btn {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 /* Common Section Containers */

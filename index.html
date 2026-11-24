@@ -38,30 +38,48 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <div class="label-row">
-              <label for="token">GitHub token (optional)</label>
-              <a href="#" id="token-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="token-help-box">How to get a token</a>
+          <!-- GitHub Auth Section -->
+          <div class="auth-section">
+            <!-- Logged out view: Login button and divider -->
+            <div id="github-login-container" class="github-login-container">
+              <button type="button" id="github-login-btn">Login with GitHub</button>
+              <div class="auth-divider">or paste a token</div>
             </div>
-            <input
-              type="password"
-              id="token"
-              name="token"
-              placeholder="Personal access token"
-              autocomplete="off"
-            >
-          </div>
 
-          <div id="token-help-box" class="help-box" hidden>
-            <p>A token lets you open private repos and avoids rate limits. It is optional for public repos.</p>
-            <ol class="help-steps">
-              <li>1. On GitHub, open Settings &gt; Developer settings &gt; Personal access tokens &gt; Fine-grained tokens.</li>
-              <li>2. Click Generate new token and give it any name.</li>
-              <li>3. Under Repository access, pick the repo(s) you want.</li>
-              <li>4. Under Permissions &gt; Repository permissions, set Contents to Read-only.</li>
-              <li>5. Click Generate and copy the token. Paste it here.</li>
-            </ol>
-            <p>The token stays in your browser and is only sent to GitHub.</p>
+            <!-- Logged in view (hidden by default) -->
+            <div id="github-logged-in-container" class="github-logged-in-container" hidden>
+              <span class="logged-in-text">Logged in with GitHub</span>
+              <button type="button" id="github-logout-btn">Log out</button>
+            </div>
+
+            <!-- Manual token field (hidden when logged in) -->
+            <div id="manual-token-container" class="manual-token-container">
+              <div class="form-group">
+                <div class="label-row">
+                  <label for="token">GitHub token (optional)</label>
+                  <a href="#" id="token-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="token-help-box">How to get a token</a>
+                </div>
+                <input
+                  type="password"
+                  id="token"
+                  name="token"
+                  placeholder="Personal access token"
+                  autocomplete="off"
+                >
+              </div>
+
+              <div id="token-help-box" class="help-box" hidden>
+                <p>A token lets you open private repos and avoids rate limits. It is optional for public repos.</p>
+                <ol class="help-steps">
+                  <li>1. On GitHub, open Settings &gt; Developer settings &gt; Personal access tokens &gt; Fine-grained tokens.</li>
+                  <li>2. Click Generate new token and give it any name.</li>
+                  <li>3. Under Repository access, pick the repo(s) you want.</li>
+                  <li>4. Under Permissions &gt; Repository permissions, set Contents to Read-only.</li>
+                  <li>5. Click Generate and copy the token. Paste it here.</li>
+                </ol>
+                <p>The token stays in your browser and is only sent to GitHub.</p>
+              </div>
+            </div>
           </div>
         </form>
       </div>

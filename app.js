@@ -1,3 +1,7 @@
+const GITHUB_CLIENT_ID = "Iv23lixyC74uqMbFMtW1";
+const AUTH_WORKER_URL = "https://git2pdf-auth.ocean-mallik.workers.dev";
+const APP_SLUG = "git2pdf";
+
 // Global variables
 var repoFiles = [];
 window.repoFiles = repoFiles;
@@ -120,6 +124,13 @@ const tokenHelpToggle = document.getElementById('token-help-toggle') || document
 const tokenHelpBox = document.getElementById('token-help-box') || document.querySelector('.help-box');
 const statusLine = document.getElementById('status') || document.getElementById('status-line');
 
+// DOM Elements: GitHub OAuth
+const githubLoginContainer = document.getElementById('github-login-container');
+const githubLoginBtn = document.getElementById('github-login-btn');
+const githubLoggedInContainer = document.getElementById('github-logged-in-container');
+const githubLogoutBtn = document.getElementById('github-logout-btn');
+const manualTokenContainer = document.getElementById('manual-token-container');
+
 // DOM Elements: ZIP Dropzone
 const zipDropzone = document.getElementById('zip-dropzone');
 const zipFileInput = document.getElementById('zip-file-input');
@@ -177,13 +188,47 @@ window.allFileNodes = allFileNodes;
 window.allFolderNodes = allFolderNodes;
 let sortableInstance = null;
 
-// Restore token from sessionStorage if present
-const storedToken = sessionStorage.getItem(TOKEN_KEY);
-if (storedToken && tokenInput) {
-  tokenInput.value = storedToken;
+// Check if user is logged in via GitHub OAuth
+function isLoggedInWithGitHub() {
+  return sessionStorage.getItem('github_oauth') === '1' && Boolean(sessionStorage.getItem(TOKEN_KEY));
 }
 
-// Keep sessionStorage in sync on token input
+// Update UI between logged in with GitHub vs manual token
+function updateAuthUI() {
+  const isOauth = isLoggedInWithGitHub();
+  const token = sessionStorage.getItem(TOKEN_KEY) || '';
+
+  if (isOauth) {
+    if (githubLoginContainer) githubLoginContainer.hidden = true;
+    if (githubLoggedInContainer) githubLoggedInContainer.hidden = false;
+    if (manualTokenContainer) manualTokenContainer.hidden = true;
+    currentToken = token;
+    window.currentToken = currentToken;
+  } else {
+    if (githubLoginContainer) githubLoginContainer.hidden = false;
+    if (githubLoggedInContainer) githubLoggedInContainer.hidden = true;
+    if (manualTokenContainer) manualTokenContainer.hidden = false;
+    if (tokenInput) {
+      tokenInput.value = token;
+    }
+    currentToken = token;
+    window.currentToken = currentToken;
+  }
+}
+
+// Log out: remove token from sessionStorage and restore logged-out UI
+function logoutGitHub() {
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem('github_oauth');
+  currentToken = '';
+  window.currentToken = currentToken;
+  if (tokenInput) {
+    tokenInput.value = '';
+  }
+  updateAuthUI();
+}
+
+// Keep sessionStorage in sync on manual token input
 if (tokenInput) {
   tokenInput.addEventListener('input', () => {
     const val = tokenInput.value.trim();
@@ -192,6 +237,9 @@ if (tokenInput) {
     } else {
       sessionStorage.removeItem(TOKEN_KEY);
     }
+    sessionStorage.removeItem('github_oauth');
+    currentToken = val;
+    window.currentToken = currentToken;
   });
 }
 
@@ -233,12 +281,160 @@ if (zipHelpToggle && zipHelpBox) {
   });
 }
 
-// Set status message helper
+// Set status message helpers
 function setStatus(message, type = '') {
   if (!statusLine) return;
   statusLine.textContent = message;
   statusLine.className = 'status-line' + (type ? ' ' + type : '');
 }
+
+function setStatusHtml(html, type = '') {
+  if (!statusLine) return;
+  statusLine.innerHTML = html;
+  statusLine.className = 'status-line' + (type ? ' ' + type : '');
+}
+
+// OAuth with PKCE helpers
+function generateCodeVerifier() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const array = new Uint8Array(64);
+  window.crypto.getRandomValues(array);
+  let verifier = '';
+  for (let i = 0; i < 64; i++) {
+    verifier += chars[array[i] % chars.length];
+  }
+  return verifier;
+}
+
+function generateState() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const array = new Uint8Array(32);
+  window.crypto.getRandomValues(array);
+  let state = '';
+  for (let i = 0; i < 32; i++) {
+    state += chars[array[i] % chars.length];
+  }
+  return state;
+}
+
+function base64UrlEncode(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+async function generateCodeChallenge(verifier) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return base64UrlEncode(digest);
+}
+
+// Start GitHub OAuth login flow
+async function startGitHubLogin() {
+  try {
+    const codeVerifier = generateCodeVerifier();
+    const state = generateState();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    sessionStorage.setItem('oauth_code_verifier', codeVerifier);
+    sessionStorage.setItem('oauth_state', state);
+
+    const authUrl = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(GITHUB_CLIENT_ID)}&state=${encodeURIComponent(state)}&code_challenge=${encodeURIComponent(codeChallenge)}&code_challenge_method=S256`;
+    window.location.href = authUrl;
+  } catch (_) {
+    setStatus('Login failed. Try again.', 'error');
+  }
+}
+
+// Handle OAuth callback on page load
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+
+  if (!code || !state) {
+    updateAuthUI();
+    return;
+  }
+
+  const savedState = sessionStorage.getItem('oauth_state');
+  const savedVerifier = sessionStorage.getItem('oauth_code_verifier');
+
+  function cleanOAuthUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('code');
+    url.searchParams.delete('state');
+    const newSearch = url.searchParams.toString() ? `?${url.searchParams.toString()}` : '';
+    window.history.replaceState({}, document.title, url.pathname + newSearch + url.hash);
+  }
+
+  if (!savedState || state !== savedState || !savedVerifier) {
+    cleanOAuthUrl();
+    updateAuthUI();
+    return;
+  }
+
+  setStatus('Logging in...', 'loading');
+
+  try {
+    const res = await fetch(`${AUTH_WORKER_URL}/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code, code_verifier: savedVerifier })
+    });
+
+    if (!res.ok) {
+      throw new Error('Token request failed');
+    }
+
+    const data = await res.json();
+    const token = data && (data.access_token || data.token);
+    if (!token) {
+      throw new Error('No access token in response');
+    }
+
+    sessionStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem('github_oauth', '1');
+    currentToken = token;
+    window.currentToken = currentToken;
+
+    sessionStorage.removeItem('oauth_code_verifier');
+    sessionStorage.removeItem('oauth_state');
+    cleanOAuthUrl();
+
+    updateAuthUI();
+    setStatus('');
+  } catch (_) {
+    sessionStorage.removeItem('oauth_code_verifier');
+    sessionStorage.removeItem('oauth_state');
+    cleanOAuthUrl();
+    updateAuthUI();
+    setStatus('Login failed. Try again.', 'error');
+  }
+}
+
+if (githubLoginBtn) {
+  githubLoginBtn.addEventListener('click', startGitHubLogin);
+}
+
+if (githubLogoutBtn) {
+  githubLogoutBtn.addEventListener('click', () => {
+    logoutGitHub();
+    setStatus('');
+  });
+}
+
+// Initialise auth on page load
+handleOAuthCallback();
 
 // Clear state helper (used on tab switch & start over)
 function clearState() {
@@ -1651,12 +1847,24 @@ async function handleHttpError(response) {
   }
 
   if (response.status === 404 || (response.status === 403 && message.includes('not accessible'))) {
-    setStatus('repo not found or private', 'error');
+    if (isLoggedInWithGitHub()) {
+      setStatusHtml(
+        `Repo not found. If it is private, give access: <a href="https://github.com/apps/${APP_SLUG}/installations/new" target="_blank" rel="noopener noreferrer">https://github.com/apps/${APP_SLUG}/installations/new</a>`,
+        'error'
+      );
+    } else {
+      setStatus('repo not found or private', 'error');
+    }
     return;
   }
 
   if (response.status === 401) {
-    setStatus('invalid token (bad credentials)', 'error');
+    if (isLoggedInWithGitHub()) {
+      logoutGitHub();
+      setStatus('Session expired. Log in again.', 'error');
+    } else {
+      setStatus('invalid token (bad credentials)', 'error');
+    }
     return;
   }
 
@@ -1670,12 +1878,16 @@ async function handleLoad(e) {
   }
 
   const rawUrl = repoUrlInput ? repoUrlInput.value.trim() : '';
-  const token = tokenInput ? tokenInput.value.trim() : '';
-
-  if (token) {
-    sessionStorage.setItem(TOKEN_KEY, token);
+  let token = '';
+  if (isLoggedInWithGitHub()) {
+    token = sessionStorage.getItem(TOKEN_KEY) || '';
   } else {
-    sessionStorage.removeItem(TOKEN_KEY);
+    token = tokenInput ? tokenInput.value.trim() : '';
+    if (token) {
+      sessionStorage.setItem(TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
   }
 
   const parsed = parseGitHubUrl(rawUrl);
@@ -1721,7 +1933,14 @@ async function handleLoad(e) {
     const repoData = await repoRes.json();
     const defaultBranch = repoData.default_branch;
     if (!defaultBranch) {
-      setStatus('repo not found or private', 'error');
+      if (isLoggedInWithGitHub()) {
+        setStatusHtml(
+          `Repo not found. If it is private, give access: <a href="https://github.com/apps/${APP_SLUG}/installations/new" target="_blank" rel="noopener noreferrer">https://github.com/apps/${APP_SLUG}/installations/new</a>`,
+          'error'
+        );
+      } else {
+        setStatus('repo not found or private', 'error');
+      }
       return;
     }
 

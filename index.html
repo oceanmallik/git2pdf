@@ -54,6 +54,7 @@
 
     <div id="status" class="status-line" role="status" aria-live="polite"></div>
 
+    <!-- Step 2: File Tree Selection Screen -->
     <div id="tree-container" class="tree-container" hidden>
       <div class="tree-toolbar">
         <div class="tree-actions">
@@ -71,8 +72,28 @@
         <button type="button" id="next-btn" disabled>Next</button>
       </div>
     </div>
+
+    <!-- Step 3: Ordering Screen -->
+    <div id="order-container" class="order-container" hidden>
+      <div class="order-toolbar">
+        <div class="order-sort-actions">
+          <button type="button" id="sort-az-btn">A to Z</button>
+          <button type="button" id="sort-folders-btn">Folders first</button>
+          <button type="button" id="sort-original-btn">Original order</button>
+        </div>
+        <span id="order-count" class="order-count">0 files</span>
+      </div>
+
+      <ul id="order-list" class="order-list" role="list"></ul>
+
+      <div class="order-footer">
+        <button type="button" id="order-back-btn">Back</button>
+        <button type="button" id="order-next-btn">Next</button>
+      </div>
+    </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

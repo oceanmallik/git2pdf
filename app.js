@@ -6,6 +6,10 @@ window.repoFiles = repoFiles;
 var selectedFiles = [];
 window.selectedFiles = selectedFiles;
 
+// Global variable for ordered files
+var orderedFiles = [];
+window.orderedFiles = orderedFiles;
+
 const TOKEN_KEY = 'github_token';
 const LARGE_FILE_LIMIT = 200 * 1024; // 200 KB in bytes
 
@@ -22,7 +26,7 @@ const IGNORED_DIRS = new Set([
   'node_modules', 'dist', 'build', '.git', '.next', '__pycache__'
 ]);
 
-// DOM Elements
+// DOM Elements: Form & Step 1
 const form = document.getElementById('repo-form');
 const repoUrlInput = document.getElementById('repo-url') || document.querySelector('input[type="text"]');
 const tokenInput = document.getElementById('token') || document.getElementById('github-token') || document.querySelector('input[type="password"]');
@@ -31,7 +35,7 @@ const tokenHelpToggle = document.getElementById('token-help-toggle') || document
 const tokenHelpBox = document.getElementById('token-help-box') || document.querySelector('.help-box');
 const statusLine = document.getElementById('status') || document.getElementById('status-line');
 
-// Tree DOM Elements
+// DOM Elements: Step 2 (Tree Screen)
 const treeContainer = document.getElementById('tree-container') || document.querySelector('.tree-container');
 const fileTreeEl = document.getElementById('file-tree');
 const selectAllBtn = document.getElementById('select-all-btn');
@@ -40,6 +44,16 @@ const selectedCountEl = document.getElementById('selected-count');
 const selectedLabelEl = document.getElementById('selected-label');
 const nextBtn = document.getElementById('next-btn');
 
+// DOM Elements: Step 3 (Ordering Screen)
+const orderContainer = document.getElementById('order-container') || document.querySelector('.order-container');
+const orderListEl = document.getElementById('order-list');
+const orderCountEl = document.getElementById('order-count');
+const sortAzBtn = document.getElementById('sort-az-btn');
+const sortFoldersBtn = document.getElementById('sort-folders-btn');
+const sortOriginalBtn = document.getElementById('sort-original-btn');
+const orderBackBtn = document.getElementById('order-back-btn');
+const orderNextBtn = document.getElementById('order-next-btn');
+
 // State
 var selectedFilePaths = new Set();
 var currentTreeRoot = null;
@@ -47,6 +61,7 @@ var allFileNodes = [];
 var allFolderNodes = [];
 window.allFileNodes = allFileNodes;
 window.allFolderNodes = allFolderNodes;
+let sortableInstance = null;
 
 // Restore token from sessionStorage if present
 const storedToken = sessionStorage.getItem(TOKEN_KEY);
@@ -148,6 +163,7 @@ function isInsideIgnoredDir(filePath) {
 }
 
 function isLargeFile(file) {
+  if (!file) return false;
   const size = Number(file.size);
   return !isNaN(size) && size > LARGE_FILE_LIMIT;
 }
@@ -273,7 +289,7 @@ function updateAllFolderStates() {
   }
 }
 
-// Update the selected count and Next button state
+// Update the selected count and Next button state in Step 2
 function updateSelectionSummary() {
   const count = selectedFilePaths.size;
   if (selectedCountEl) {
@@ -436,11 +452,18 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Render the tree
+// Render the tree in Step 2
 function renderTree(files) {
   if (!fileTreeEl || !treeContainer) return;
 
   fileTreeEl.innerHTML = '';
+  if (typeof fileTreeEl.replaceChildren === 'function') {
+    fileTreeEl.replaceChildren();
+  } else {
+    while (fileTreeEl.firstChild) {
+      fileTreeEl.removeChild(fileTreeEl.firstChild);
+    }
+  }
   allFileNodes = [];
   allFolderNodes = [];
   window.allFileNodes = allFileNodes;
@@ -468,10 +491,11 @@ function renderTree(files) {
 
   updateAllFolderStates();
   updateSelectionSummary();
+  if (orderContainer) orderContainer.hidden = true;
   treeContainer.hidden = false;
 }
 
-// Select All
+// Select All in Step 2
 if (selectAllBtn) {
   selectAllBtn.addEventListener('click', () => {
     for (const f of allFileNodes) {
@@ -483,7 +507,7 @@ if (selectAllBtn) {
   });
 }
 
-// Deselect All
+// Deselect All in Step 2
 if (deselectAllBtn) {
   deselectAllBtn.addEventListener('click', () => {
     selectedFilePaths.clear();
@@ -495,10 +519,215 @@ if (deselectAllBtn) {
   });
 }
 
-// Next Button click handler
+// ==========================================
+// Step 3: Ordering Screen Logic
+// ==========================================
+
+// Sorting comparison: Folders first (alphabetical, folders grouped together)
+function compareFoldersFirst(aPath, bPath) {
+  const partsA = aPath.split('/');
+  const partsB = bPath.split('/');
+  const minLen = Math.min(partsA.length, partsB.length);
+
+  for (let i = 0; i < minLen; i++) {
+    const segA = partsA[i];
+    const segB = partsB[i];
+    const isFolderA = (i < partsA.length - 1);
+    const isFolderB = (i < partsB.length - 1);
+
+    if (segA !== segB) {
+      if (isFolderA && !isFolderB) return -1;
+      if (!isFolderA && isFolderB) return 1;
+      return segA.localeCompare(segB, undefined, { sensitivity: 'base', numeric: true });
+    }
+  }
+  return partsB.length - partsA.length;
+}
+
+// Sort by A to Z (full path alphabetical)
+function sortListAtoZ(list) {
+  return [...list].sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base', numeric: true }));
+}
+
+// Sort by Folders first (default order)
+function sortListFoldersFirst(list) {
+  return [...list].sort((a, b) => compareFoldersFirst(a.path, b.path));
+}
+
+// Sort by Original order (original order in repoFiles)
+function sortListOriginal(list) {
+  const originalIndex = new Map();
+  repoFiles.forEach((file, idx) => {
+    originalIndex.set(file.path, idx);
+  });
+  return [...list].sort((a, b) => {
+    const idxA = originalIndex.has(a.path) ? originalIndex.get(a.path) : 0;
+    const idxB = originalIndex.has(b.path) ? originalIndex.get(b.path) : 0;
+    return idxA - idxB;
+  });
+}
+
+// Set active sort button indicator
+function setActiveSortButton(btnId) {
+  [sortAzBtn, sortFoldersBtn, sortOriginalBtn].forEach(btn => {
+    if (btn) btn.classList.remove('active');
+  });
+  const activeBtn = document.getElementById(btnId);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+}
+
+// Render the ordered list into the DOM
+function renderOrderListDOM() {
+  if (!orderListEl) return;
+  orderListEl.innerHTML = '';
+  if (typeof orderListEl.replaceChildren === 'function') {
+    orderListEl.replaceChildren();
+  } else {
+    while (orderListEl.firstChild) {
+      orderListEl.removeChild(orderListEl.firstChild);
+    }
+  }
+
+  const fragment = document.createDocumentFragment();
+  for (const file of orderedFiles) {
+    const li = document.createElement('li');
+    li.className = 'order-item';
+    li.dataset.path = file.path;
+
+    // Drag handle
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.title = 'Drag to reorder';
+    handle.setAttribute('aria-label', 'Drag handle');
+    handle.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <circle cx="5" cy="3" r="1.5"/>
+        <circle cx="11" cy="3" r="1.5"/>
+        <circle cx="5" cy="8" r="1.5"/>
+        <circle cx="11" cy="8" r="1.5"/>
+        <circle cx="5" cy="13" r="1.5"/>
+        <circle cx="11" cy="13" r="1.5"/>
+      </svg>
+    `;
+
+    // Path
+    const pathSpan = document.createElement('span');
+    pathSpan.className = 'order-path';
+    pathSpan.textContent = file.path;
+
+    li.appendChild(handle);
+    li.appendChild(pathSpan);
+    fragment.appendChild(li);
+  }
+  orderListEl.appendChild(fragment);
+
+  if (orderCountEl) {
+    const count = orderedFiles.length;
+    orderCountEl.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+  }
+}
+
+// Sync orderedFiles array from DOM after drag-and-drop
+function syncOrderedFilesFromDOM() {
+  if (!orderListEl) return;
+  const items = Array.from(orderListEl.querySelectorAll('.order-item'));
+  const fileMap = new Map();
+  for (const file of window.repoFiles) {
+    fileMap.set(file.path, file);
+  }
+  orderedFiles = items
+    .map(el => fileMap.get(el.dataset.path))
+    .filter(Boolean);
+  window.orderedFiles = orderedFiles;
+  [sortAzBtn, sortFoldersBtn, sortOriginalBtn].forEach(b => b && b.classList.remove('active'));
+}
+
+// Initialize SortableJS
+function initSortable() {
+  if (!orderListEl) return;
+  if (sortableInstance) {
+    sortableInstance.destroy();
+    sortableInstance = null;
+  }
+  if (typeof Sortable !== 'undefined') {
+    sortableInstance = new Sortable(orderListEl, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: () => {
+        syncOrderedFilesFromDOM();
+      }
+    });
+  }
+}
+
+// Enter Step 3: Ordering screen
+function openOrderingScreen() {
+  const currentFiles = Array.isArray(window.repoFiles) ? window.repoFiles : [];
+  const selected = currentFiles.filter(f => selectedFilePaths.has(f.path));
+  if (selected.length === 0) return;
+
+  // Default order: alphabetical, folders grouped together
+  orderedFiles = sortListFoldersFirst(selected);
+  window.orderedFiles = orderedFiles;
+
+  if (treeContainer) treeContainer.hidden = true;
+  if (orderContainer) orderContainer.hidden = false;
+
+  renderOrderListDOM();
+  setActiveSortButton('sort-folders-btn');
+  initSortable();
+}
+
+// Step 2 Next button -> goes to Step 3
 if (nextBtn) {
-  nextBtn.addEventListener('click', () => {
-    console.log('Next clicked. Selected files:', window.selectedFiles);
+  nextBtn.addEventListener('click', openOrderingScreen);
+}
+
+// Step 3 Sort buttons
+if (sortAzBtn) {
+  sortAzBtn.addEventListener('click', () => {
+    orderedFiles = sortListAtoZ(orderedFiles);
+    window.orderedFiles = orderedFiles;
+    renderOrderListDOM();
+    setActiveSortButton('sort-az-btn');
+  });
+}
+
+if (sortFoldersBtn) {
+  sortFoldersBtn.addEventListener('click', () => {
+    orderedFiles = sortListFoldersFirst(orderedFiles);
+    window.orderedFiles = orderedFiles;
+    renderOrderListDOM();
+    setActiveSortButton('sort-folders-btn');
+  });
+}
+
+if (sortOriginalBtn) {
+  sortOriginalBtn.addEventListener('click', () => {
+    orderedFiles = sortListOriginal(orderedFiles);
+    window.orderedFiles = orderedFiles;
+    renderOrderListDOM();
+    setActiveSortButton('sort-original-btn');
+  });
+}
+
+// Step 3 Back button -> returns to Step 2 keeping the selection
+if (orderBackBtn) {
+  orderBackBtn.addEventListener('click', () => {
+    if (orderContainer) orderContainer.hidden = true;
+    if (treeContainer) treeContainer.hidden = false;
+  });
+}
+
+// Step 3 Next button
+if (orderNextBtn) {
+  orderNextBtn.addEventListener('click', () => {
+    console.log('Step 3 confirmed. Final ordered files:', window.orderedFiles);
+    setStatus(`Ordering confirmed: ${orderedFiles.length} files selected.`);
   });
 }
 
@@ -549,6 +778,7 @@ async function handleLoad(e) {
   if (!parsed) {
     setStatus('invalid URL', 'error');
     if (treeContainer) treeContainer.hidden = true;
+    if (orderContainer) orderContainer.hidden = true;
     return;
   }
 
@@ -562,6 +792,7 @@ async function handleLoad(e) {
 
   if (loadBtn) loadBtn.disabled = true;
   if (treeContainer) treeContainer.hidden = true;
+  if (orderContainer) orderContainer.hidden = true;
   setStatus('Loading...', 'loading');
 
   try {

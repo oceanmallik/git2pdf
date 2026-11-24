@@ -11,18 +11,26 @@ window.orderedFiles = orderedFiles;
 var processedFiles = [];
 window.processedFiles = processedFiles;
 
-// Current repo info
+// Current repo / project info
+var currentSource = 'github'; // 'github' or 'zip'
 var currentOwner = '';
 var currentRepo = '';
 var currentBranch = '';
 var currentToken = '';
+var currentZipFileName = '';
+var zipFileContents = new Map(); // path -> Uint8Array
+
+window.currentSource = currentSource;
 window.currentOwner = currentOwner;
 window.currentRepo = currentRepo;
 window.currentBranch = currentBranch;
 window.currentToken = currentToken;
+window.currentZipFileName = currentZipFileName;
+window.zipFileContents = zipFileContents;
 
 const TOKEN_KEY = 'github_token';
 const LARGE_FILE_LIMIT = 200 * 1024; // 200 KB in bytes
+const MAX_ZIP_SIZE = 100 * 1024 * 1024; // 100 MB max zip size
 
 const BINARY_EXTENSIONS = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'svg', 'pdf',
@@ -97,7 +105,13 @@ const EXTENSION_TO_LANGUAGE = {
   txt: 'plaintext'
 };
 
-// DOM Elements: Form & Step 1
+// DOM Elements: Step 1 (Input Section & Tabs)
+const inputSection = document.getElementById('input-section') || document.querySelector('.input-section');
+const tabGithubBtn = document.getElementById('tab-github-btn');
+const tabZipBtn = document.getElementById('tab-zip-btn');
+const tabGithubPanel = document.getElementById('tab-github-panel');
+const tabZipPanel = document.getElementById('tab-zip-panel');
+
 const form = document.getElementById('repo-form');
 const repoUrlInput = document.getElementById('repo-url') || document.querySelector('input[type="text"]');
 const tokenInput = document.getElementById('token') || document.getElementById('github-token') || document.querySelector('input[type="password"]');
@@ -105,6 +119,12 @@ const loadBtn = document.getElementById('load-btn') || document.querySelector('b
 const tokenHelpToggle = document.getElementById('token-help-toggle') || document.querySelector('.help-link');
 const tokenHelpBox = document.getElementById('token-help-box') || document.querySelector('.help-box');
 const statusLine = document.getElementById('status') || document.getElementById('status-line');
+
+// DOM Elements: ZIP Dropzone
+const zipDropzone = document.getElementById('zip-dropzone');
+const zipFileInput = document.getElementById('zip-file-input');
+const zipHelpToggle = document.getElementById('zip-help-toggle');
+const zipHelpBox = document.getElementById('zip-help-box');
 
 // DOM Elements: Step 2 (Tree Screen)
 const treeContainer = document.getElementById('tree-container') || document.querySelector('.tree-container');
@@ -114,6 +134,8 @@ const deselectAllBtn = document.getElementById('deselect-all-btn');
 const selectedCountEl = document.getElementById('selected-count');
 const selectedLabelEl = document.getElementById('selected-label');
 const nextBtn = document.getElementById('next-btn');
+const treeBackBtn = document.getElementById('tree-back-btn');
+const treeStartOverBtn = document.getElementById('tree-start-over-btn');
 
 // DOM Elements: Step 3 (Ordering Screen)
 const orderContainer = document.getElementById('order-container') || document.querySelector('.order-container');
@@ -123,6 +145,7 @@ const sortAzBtn = document.getElementById('sort-az-btn');
 const sortFoldersBtn = document.getElementById('sort-folders-btn');
 const sortOriginalBtn = document.getElementById('sort-original-btn');
 const orderBackBtn = document.getElementById('order-back-btn');
+const orderStartOverBtn = document.getElementById('order-start-over-btn');
 const orderNextBtn = document.getElementById('order-next-btn');
 
 // DOM Elements: Step 4 (Content Fetching & PDF Export Screen)
@@ -134,6 +157,7 @@ const skippedContainerEl = document.getElementById('skipped-container');
 const skippedCountEl = document.getElementById('skipped-count');
 const skippedListEl = document.getElementById('skipped-list');
 const fetchBackBtn = document.getElementById('fetch-back-btn');
+const fetchStartOverBtn = document.getElementById('fetch-start-over-btn');
 const pdfControlsEl = document.getElementById('pdf-controls');
 const fontSelectEl = document.getElementById('font-select');
 const fontSizeSelectEl = document.getElementById('font-size-select');
@@ -144,6 +168,7 @@ const pdfBwBtn = document.getElementById('pdf-bw-btn');
 const printViewEl = document.getElementById('print-view');
 
 // State
+var activeTab = 'github'; // 'github' or 'zip'
 var selectedFilePaths = new Set();
 var currentTreeRoot = null;
 var allFileNodes = [];
@@ -170,7 +195,7 @@ if (tokenInput) {
   });
 }
 
-// Toggle help box
+// Toggle token help box
 if (tokenHelpToggle && tokenHelpBox) {
   tokenHelpToggle.addEventListener('click', (e) => {
     e.preventDefault();
@@ -189,11 +214,134 @@ if (tokenHelpToggle && tokenHelpBox) {
   });
 }
 
+// Toggle zip help box
+if (zipHelpToggle && zipHelpBox) {
+  zipHelpToggle.addEventListener('click', (e) => {
+    e.preventDefault();
+    const isHidden = zipHelpBox.hidden || zipHelpBox.classList.contains('hidden') || zipHelpBox.style.display === 'none';
+    if (isHidden) {
+      zipHelpBox.hidden = false;
+      zipHelpBox.classList.remove('hidden');
+      zipHelpBox.style.display = 'block';
+      zipHelpToggle.setAttribute('aria-expanded', 'true');
+    } else {
+      zipHelpBox.hidden = true;
+      zipHelpBox.classList.add('hidden');
+      zipHelpBox.style.display = 'none';
+      zipHelpToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
 // Set status message helper
 function setStatus(message, type = '') {
   if (!statusLine) return;
   statusLine.textContent = message;
   statusLine.className = 'status-line' + (type ? ' ' + type : '');
+}
+
+// Clear state helper (used on tab switch & start over)
+function clearState() {
+  repoFiles = [];
+  selectedFiles = [];
+  orderedFiles = [];
+  processedFiles = [];
+  window.repoFiles = repoFiles;
+  window.selectedFiles = selectedFiles;
+  window.orderedFiles = orderedFiles;
+  window.processedFiles = processedFiles;
+
+  selectedFilePaths.clear();
+  currentTreeRoot = null;
+  allFileNodes = [];
+  allFolderNodes = [];
+  window.allFileNodes = allFileNodes;
+  window.allFolderNodes = allFolderNodes;
+
+  zipFileContents.clear();
+  currentZipFileName = '';
+  currentSource = activeTab === 'zip' ? 'zip' : 'github';
+  window.currentSource = currentSource;
+  window.currentZipFileName = currentZipFileName;
+
+  if (fileTreeEl) fileTreeEl.innerHTML = '';
+  if (orderListEl) orderListEl.innerHTML = '';
+  if (skippedListEl) skippedListEl.innerHTML = '';
+  if (printViewEl) printViewEl.innerHTML = '';
+
+  if (treeContainer) treeContainer.hidden = true;
+  if (orderContainer) orderContainer.hidden = true;
+  if (fetchContainer) fetchContainer.hidden = true;
+
+  if (zipFileInput) zipFileInput.value = '';
+  if (zipDropzone) zipDropzone.classList.remove('dragover');
+
+  setStatus('');
+}
+
+// Show initial screen (Step 1)
+function showInitialScreen() {
+  if (treeContainer) treeContainer.hidden = true;
+  if (orderContainer) orderContainer.hidden = true;
+  if (fetchContainer) fetchContainer.hidden = true;
+  if (inputSection) inputSection.hidden = false;
+
+  if (activeTab === 'zip') {
+    if (tabGithubPanel) tabGithubPanel.hidden = true;
+    if (tabZipPanel) tabZipPanel.hidden = false;
+  } else {
+    if (tabGithubPanel) tabGithubPanel.hidden = false;
+    if (tabZipPanel) tabZipPanel.hidden = true;
+  }
+}
+
+// Start over
+function startOver() {
+  clearState();
+  showInitialScreen();
+}
+
+// Switch tabs
+function switchTab(tab) {
+  if (tab === activeTab) return;
+  clearState();
+  activeTab = tab;
+  currentSource = tab;
+  window.currentSource = currentSource;
+
+  if (tab === 'github') {
+    if (tabGithubBtn) {
+      tabGithubBtn.classList.add('active');
+      tabGithubBtn.setAttribute('aria-selected', 'true');
+    }
+    if (tabZipBtn) {
+      tabZipBtn.classList.remove('active');
+      tabZipBtn.setAttribute('aria-selected', 'false');
+    }
+    if (tabGithubPanel) tabGithubPanel.hidden = false;
+    if (tabZipPanel) tabZipPanel.hidden = true;
+  } else {
+    if (tabZipBtn) {
+      tabZipBtn.classList.add('active');
+      tabZipBtn.setAttribute('aria-selected', 'true');
+    }
+    if (tabGithubBtn) {
+      tabGithubBtn.classList.remove('active');
+      tabGithubBtn.setAttribute('aria-selected', 'false');
+    }
+    if (tabGithubPanel) tabGithubPanel.hidden = true;
+    if (tabZipPanel) tabZipPanel.hidden = false;
+  }
+
+  showInitialScreen();
+}
+
+if (tabGithubBtn) {
+  tabGithubBtn.addEventListener('click', () => switchTab('github'));
+}
+
+if (tabZipBtn) {
+  tabZipBtn.addEventListener('click', () => switchTab('zip'));
 }
 
 // Parse GitHub repository URL
@@ -276,6 +424,179 @@ function shouldDeselectByDefault(file) {
     }
   }
   return false;
+}
+
+// ==========================================
+// Step 1: ZIP File Handling
+// ==========================================
+
+function shouldIgnoreZipEntry(path, isDir) {
+  if (isDir) return true;
+  const norm = path.replace(/\\/g, '/');
+  if (norm.endsWith('/')) return true;
+
+  const parts = norm.split('/');
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part === '__MACOSX') return true;
+    if (part === '.DS_Store') return true;
+    if (part === '.git') return true;
+  }
+  const filename = parts[parts.length - 1];
+  if (filename === '.DS_Store') return true;
+  return false;
+}
+
+async function handleZipFile(file) {
+  if (!file) return;
+
+  // 1. Not a zip file check
+  if (!file.name.toLowerCase().endsWith('.zip')) {
+    setStatus('not a zip file', 'error');
+    return;
+  }
+
+  // 2. Empty file check
+  if (file.size === 0) {
+    setStatus('empty zip', 'error');
+    return;
+  }
+
+  // 3. File too large to read check
+  if (file.size > MAX_ZIP_SIZE) {
+    setStatus('file too large to read', 'error');
+    return;
+  }
+
+  setStatus('Reading ZIP...', 'loading');
+
+  let zip;
+  try {
+    if (typeof JSZip === 'undefined') {
+      setStatus('JSZip library not loaded', 'error');
+      return;
+    }
+    zip = await JSZip.loadAsync(file);
+  } catch (err) {
+    const msg = (err && err.message) ? err.message.toLowerCase() : '';
+    if (err && (err.name === 'RangeError' || msg.includes('memory') || msg.includes('large'))) {
+      setStatus('file too large to read', 'error');
+    } else {
+      setStatus('not a zip file', 'error');
+    }
+    return;
+  }
+
+  // Filter out directories, __MACOSX, .DS_Store, .git
+  const validEntries = [];
+  zip.forEach((relativePath, zipEntry) => {
+    if (!shouldIgnoreZipEntry(relativePath, zipEntry.dir)) {
+      validEntries.push({ rawPath: relativePath.replace(/\\/g, '/'), zipEntry });
+    }
+  });
+
+  if (validEntries.length === 0) {
+    setStatus('empty zip', 'error');
+    return;
+  }
+
+  // Check if every path shares one single top-level folder
+  let removePrefix = '';
+  const firstParts = validEntries[0].rawPath.split('/');
+  if (firstParts.length > 1) {
+    const candidateTop = firstParts[0];
+    const allShare = validEntries.every(entry => {
+      const p = entry.rawPath.split('/');
+      return p.length > 1 && p[0] === candidateTop;
+    });
+    if (allShare) {
+      removePrefix = candidateTop + '/';
+    }
+  }
+
+  // Build file list and keep each file's content in memory
+  zipFileContents.clear();
+  const fileList = [];
+  currentSource = 'zip';
+  currentZipFileName = file.name;
+  window.currentSource = currentSource;
+  window.currentZipFileName = currentZipFileName;
+
+  try {
+    for (const entry of validEntries) {
+      const finalPath = removePrefix ? entry.rawPath.slice(removePrefix.length) : entry.rawPath;
+      const uint8 = await entry.zipEntry.async('uint8array');
+      zipFileContents.set(finalPath, uint8);
+      fileList.push({
+        path: finalPath,
+        size: uint8.byteLength,
+        type: 'blob'
+      });
+    }
+  } catch (err) {
+    const msg = (err && err.message) ? err.message.toLowerCase() : '';
+    if (err && (err.name === 'RangeError' || msg.includes('memory') || msg.includes('large'))) {
+      setStatus('file too large to read', 'error');
+    } else {
+      setStatus('not a zip file', 'error');
+    }
+    return;
+  }
+
+  if (fileList.length === 0) {
+    setStatus('empty zip', 'error');
+    return;
+  }
+
+  repoFiles = fileList;
+  window.repoFiles = fileList;
+
+  setStatus(`Loaded ${fileList.length} files.`, 'success');
+  if (inputSection) inputSection.hidden = true;
+  renderTree(fileList);
+}
+
+// Bind Dropzone events
+if (zipDropzone && zipFileInput) {
+  zipDropzone.addEventListener('click', () => {
+    zipFileInput.click();
+  });
+
+  zipDropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      zipFileInput.click();
+    }
+  });
+
+  zipFileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleZipFile(e.target.files[0]);
+    }
+  });
+
+  zipDropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zipDropzone.classList.add('dragover');
+  });
+
+  zipDropzone.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    zipDropzone.classList.add('dragover');
+  });
+
+  zipDropzone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    zipDropzone.classList.remove('dragover');
+  });
+
+  zipDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zipDropzone.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleZipFile(e.dataTransfer.files[0]);
+    }
+  });
 }
 
 // Tree Node Class
@@ -587,6 +908,7 @@ function renderTree(files) {
   updateSelectionSummary();
   if (orderContainer) orderContainer.hidden = true;
   if (fetchContainer) fetchContainer.hidden = true;
+  if (inputSection) inputSection.hidden = true;
   treeContainer.hidden = false;
 }
 
@@ -612,6 +934,18 @@ if (deselectAllBtn) {
     updateAllFolderStates();
     updateSelectionSummary();
   });
+}
+
+// Step 2 Back & Start over buttons
+if (treeBackBtn) {
+  treeBackBtn.addEventListener('click', () => {
+    if (treeContainer) treeContainer.hidden = true;
+    if (inputSection) inputSection.hidden = false;
+  });
+}
+
+if (treeStartOverBtn) {
+  treeStartOverBtn.addEventListener('click', startOver);
 }
 
 // ==========================================
@@ -769,6 +1103,7 @@ function openOrderingScreen() {
   orderedFiles = sortListFoldersFirst(selected);
   window.orderedFiles = orderedFiles;
 
+  if (inputSection) inputSection.hidden = true;
   if (treeContainer) treeContainer.hidden = true;
   if (fetchContainer) fetchContainer.hidden = true;
   if (orderContainer) orderContainer.hidden = false;
@@ -817,6 +1152,11 @@ if (orderBackBtn) {
     if (orderContainer) orderContainer.hidden = true;
     if (treeContainer) treeContainer.hidden = false;
   });
+}
+
+// Step 3 Start over button
+if (orderStartOverBtn) {
+  orderStartOverBtn.addEventListener('click', startOver);
 }
 
 // Step 3 Next button -> transitions to Step 4
@@ -930,7 +1270,7 @@ function splitHighlightedIntoLines(html) {
   return lines;
 }
 
-// Fetch single file content and process
+// Fetch single file content from GitHub and process
 async function fetchAndProcessFile(file) {
   const path = file.path;
   let text = '';
@@ -971,7 +1311,7 @@ async function fetchAndProcessFile(file) {
   return { skipped: false, path, language, lines };
 }
 
-// Concurrent worker pool: fetch 5 at a time
+// Concurrent worker pool for GitHub flow: fetch 5 at a time
 async function runConcurrentFetch(files, concurrency = 5, onProgress) {
   const results = [];
   const skipped = [];
@@ -1014,36 +1354,93 @@ async function runConcurrentFetch(files, concurrency = 5, onProgress) {
   return { results, skipped };
 }
 
-// Enter Step 4: Content Fetching screen
+// Enter Step 4: Content Fetching / Processing screen
 async function openFetchScreen() {
   if (!orderedFiles || orderedFiles.length === 0) return;
 
+  if (inputSection) inputSection.hidden = true;
   if (orderContainer) orderContainer.hidden = true;
   if (fetchContainer) fetchContainer.hidden = false;
 
   const total = orderedFiles.length;
   if (progressTextEl) progressTextEl.textContent = `0 / ${total}`;
   if (progressBarFillEl) progressBarFillEl.style.width = '0%';
-  if (fetchStatusLineEl) fetchStatusLineEl.textContent = 'Starting download...';
+  if (fetchStatusLineEl) fetchStatusLineEl.textContent = (currentSource === 'zip') ? 'Processing files...' : 'Starting download...';
   if (skippedContainerEl) skippedContainerEl.hidden = true;
   if (skippedListEl) skippedListEl.innerHTML = '';
   if (pdfControlsEl) pdfControlsEl.hidden = true;
   if (fetchBackBtn) fetchBackBtn.disabled = true;
 
-  const { results, skipped } = await runConcurrentFetch(orderedFiles, 5, (completed, totalCount, lastPath) => {
-    if (progressTextEl) {
-      progressTextEl.textContent = `${completed} / ${totalCount}`;
-    }
-    if (progressBarFillEl) {
-      const pct = Math.round((completed / totalCount) * 100);
-      progressBarFillEl.style.width = `${pct}%`;
-    }
-    if (fetchStatusLineEl) {
-      fetchStatusLineEl.textContent = `Processing (${completed}/${totalCount}): ${lastPath}`;
-    }
-  });
+  let results = [];
+  let skipped = [];
 
-  processedFiles = results.map(({ path, language, lines }) => ({ path, language, lines }));
+  if (currentSource === 'zip') {
+    // ZIP flow: in-memory decoding with TextDecoder, no network fetch
+    let completed = 0;
+    for (const file of orderedFiles) {
+      const uint8 = zipFileContents.get(file.path);
+      let isBinary = false;
+      let text = '';
+
+      if (!uint8) {
+        isBinary = true;
+      } else {
+        try {
+          const decoder = new TextDecoder('utf-8', { fatal: true });
+          text = decoder.decode(uint8);
+        } catch (_) {
+          isBinary = true;
+        }
+      }
+
+      if (!isBinary && text.includes('\0')) {
+        isBinary = true;
+      }
+
+      if (isBinary) {
+        skipped.push({ path: file.path, reason: 'Looks binary' });
+      } else {
+        const normalized = normalizeText(text);
+        const language = detectLanguage(file.path);
+        const highlightedHtml = highlightCode(normalized, language);
+        const lines = splitHighlightedIntoLines(highlightedHtml);
+        results.push({ path: file.path, language, lines });
+      }
+
+      completed++;
+      if (progressTextEl) {
+        progressTextEl.textContent = `${completed} / ${total}`;
+      }
+      if (progressBarFillEl) {
+        const pct = Math.round((completed / total) * 100);
+        progressBarFillEl.style.width = `${pct}%`;
+      }
+      if (fetchStatusLineEl) {
+        fetchStatusLineEl.textContent = `Processing (${completed}/${total}): ${file.path}`;
+      }
+
+      // Small async tick for smooth UI updates
+      await new Promise(r => setTimeout(r, 0));
+    }
+  } else {
+    // GitHub flow: network fetching 5 at a time
+    const res = await runConcurrentFetch(orderedFiles, 5, (completed, totalCount, lastPath) => {
+      if (progressTextEl) {
+        progressTextEl.textContent = `${completed} / ${totalCount}`;
+      }
+      if (progressBarFillEl) {
+        const pct = Math.round((completed / totalCount) * 100);
+        progressBarFillEl.style.width = `${pct}%`;
+      }
+      if (fetchStatusLineEl) {
+        fetchStatusLineEl.textContent = `Processing (${completed}/${totalCount}): ${lastPath}`;
+      }
+    });
+    results = res.results;
+    skipped = res.skipped;
+  }
+
+  processedFiles = results;
   window.processedFiles = processedFiles;
 
   // Display skipped files if any
@@ -1068,8 +1465,6 @@ async function openFetchScreen() {
   if (pdfControlsEl) {
     pdfControlsEl.hidden = false;
   }
-
-  console.log('Step 4 results ready in window.processedFiles:', window.processedFiles);
 }
 
 // Step 4 Back button -> returns to Step 3
@@ -1078,6 +1473,11 @@ if (fetchBackBtn) {
     if (fetchContainer) fetchContainer.hidden = true;
     if (orderContainer) orderContainer.hidden = false;
   });
+}
+
+// Step 4 Start over button
+if (fetchStartOverBtn) {
+  fetchStartOverBtn.addEventListener('click', startOver);
 }
 
 // ==========================================
@@ -1092,7 +1492,9 @@ function renderPrintHtml(repoName, branch, files) {
   html += '<div class="cover-page">';
   html += `<h1 class="cover-repo-name">${escapeHtml(repoName)}</h1>`;
   html += '<div class="cover-meta">';
-  html += `<div class="cover-meta-item"><strong>Branch:</strong> ${escapeHtml(branch)}</div>`;
+  if (branch) {
+    html += `<div class="cover-meta-item"><strong>Branch:</strong> ${escapeHtml(branch)}</div>`;
+  }
   html += `<div class="cover-meta-item"><strong>File count:</strong> ${files.length}</div>`;
   html += '</div>';
   html += '<div class="cover-toc">';
@@ -1194,12 +1596,20 @@ async function printDocument(mode) {
   `;
 
   // Render print-ready document HTML
-  const owner = currentOwner || window.currentOwner || '';
-  const repo = currentRepo || window.currentRepo || '';
-  const branchName = currentBranch || window.currentBranch || 'main';
-  const repoFullName = (owner && repo) ? `${owner}/${repo}` : (repo || 'Repository');
+  let projectName = '';
+  let branchName = '';
 
-  printViewEl.innerHTML = renderPrintHtml(repoFullName, branchName, window.processedFiles);
+  if (currentSource === 'zip') {
+    projectName = (currentZipFileName || 'Project').replace(/\.zip$/i, '');
+    branchName = ''; // Hide branch line for ZIP projects
+  } else {
+    const owner = currentOwner || window.currentOwner || '';
+    const repo = currentRepo || window.currentRepo || '';
+    branchName = currentBranch || window.currentBranch || 'main';
+    projectName = (owner && repo) ? `${owner}/${repo}` : (repo || 'Repository');
+  }
+
+  printViewEl.innerHTML = renderPrintHtml(projectName, branchName, window.processedFiles);
 
   // Wait for Google Fonts before printing
   if (document.fonts && document.fonts.ready) {
@@ -1253,7 +1663,7 @@ async function handleHttpError(response) {
   setStatus(errBody && errBody.message ? errBody.message : `Error ${response.status}`, 'error');
 }
 
-// Main load function
+// Main load function for GitHub flow
 async function handleLoad(e) {
   if (e) {
     e.preventDefault();
@@ -1278,9 +1688,11 @@ async function handleLoad(e) {
   }
 
   const { owner, repo } = parsed;
+  currentSource = 'github';
   currentOwner = owner;
   currentRepo = repo;
   currentToken = token;
+  window.currentSource = currentSource;
   window.currentOwner = currentOwner;
   window.currentRepo = currentRepo;
   window.currentToken = currentToken;
@@ -1340,11 +1752,13 @@ async function handleLoad(e) {
 
     if (treeData.truncated) {
       setStatus('truncated tree', 'error');
+      if (inputSection) inputSection.hidden = true;
       renderTree(fileList);
       return;
     }
 
     setStatus(`Loaded ${fileList.length} files.`, 'success');
+    if (inputSection) inputSection.hidden = true;
     renderTree(fileList);
   } catch (err) {
     setStatus(err.message || 'Error loading repository', 'error');
@@ -1353,7 +1767,7 @@ async function handleLoad(e) {
   }
 }
 
-// Bind events
+// Bind form submission
 if (form) {
   form.addEventListener('submit', handleLoad);
 } else if (loadBtn) {

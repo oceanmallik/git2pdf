@@ -12,49 +12,75 @@
 </head>
 <body>
   <div class="container">
-    <form id="repo-form">
-      <div class="form-group">
-        <label for="repo-url">GitHub repo URL</label>
-        <div class="input-row">
-          <input
-            type="text"
-            id="repo-url"
-            name="repo-url"
-            placeholder="https://github.com/owner/repo"
-            required
-            autocomplete="off"
-            spellcheck="false"
-          >
-          <button type="submit" id="load-btn">Load</button>
-        </div>
+    <!-- Step 1: Input Section with Tabs -->
+    <div id="input-section" class="input-section">
+      <div class="tabs-nav" role="tablist">
+        <button type="button" id="tab-github-btn" class="tab-btn active" role="tab" aria-selected="true" aria-controls="tab-github-panel">GitHub URL</button>
+        <button type="button" id="tab-zip-btn" class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-zip-panel">Upload ZIP</button>
       </div>
 
-      <div class="form-group">
-        <div class="label-row">
-          <label for="token">GitHub token (optional)</label>
-          <a href="#" id="token-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="token-help-box">How to get a token</a>
-        </div>
-        <input
-          type="password"
-          id="token"
-          name="token"
-          placeholder="Personal access token"
-          autocomplete="off"
-        >
+      <!-- Tab 1: GitHub URL Panel -->
+      <div id="tab-github-panel" class="tab-panel active" role="tabpanel" aria-labelledby="tab-github-btn">
+        <form id="repo-form">
+          <div class="form-group">
+            <label for="repo-url">GitHub repo URL</label>
+            <div class="input-row">
+              <input
+                type="text"
+                id="repo-url"
+                name="repo-url"
+                placeholder="https://github.com/owner/repo"
+                required
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button type="submit" id="load-btn">Load</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="label-row">
+              <label for="token">GitHub token (optional)</label>
+              <a href="#" id="token-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="token-help-box">How to get a token</a>
+            </div>
+            <input
+              type="password"
+              id="token"
+              name="token"
+              placeholder="Personal access token"
+              autocomplete="off"
+            >
+          </div>
+
+          <div id="token-help-box" class="help-box" hidden>
+            <p>A token lets you open private repos and avoids rate limits. It is optional for public repos.</p>
+            <ol class="help-steps">
+              <li>1. On GitHub, open Settings &gt; Developer settings &gt; Personal access tokens &gt; Fine-grained tokens.</li>
+              <li>2. Click Generate new token and give it any name.</li>
+              <li>3. Under Repository access, pick the repo(s) you want.</li>
+              <li>4. Under Permissions &gt; Repository permissions, set Contents to Read-only.</li>
+              <li>5. Click Generate and copy the token. Paste it here.</li>
+            </ol>
+            <p>The token stays in your browser and is only sent to GitHub.</p>
+          </div>
+        </form>
       </div>
 
-      <div id="token-help-box" class="help-box" hidden>
-        <p>A token lets you open private repos and avoids rate limits. It is optional for public repos.</p>
-        <ol class="help-steps">
-          <li>1. On GitHub, open Settings &gt; Developer settings &gt; Personal access tokens &gt; Fine-grained tokens.</li>
-          <li>2. Click Generate new token and give it any name.</li>
-          <li>3. Under Repository access, pick the repo(s) you want.</li>
-          <li>4. Under Permissions &gt; Repository permissions, set Contents to Read-only.</li>
-          <li>5. Click Generate and copy the token. Paste it here.</li>
-        </ol>
-        <p>The token stays in your browser and is only sent to GitHub.</p>
+      <!-- Tab 2: Upload ZIP Panel -->
+      <div id="tab-zip-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-zip-btn" hidden>
+        <div id="zip-dropzone" class="zip-dropzone" tabindex="0" role="button" aria-label="Drop your project ZIP here or click to choose">
+          <input type="file" id="zip-file-input" accept=".zip" hidden>
+          <div class="dropzone-text">Drop your project ZIP here or click to choose</div>
+        </div>
+        <div class="zip-help-row">
+          <a href="#" id="zip-help-toggle" class="help-link" role="button" aria-expanded="false" aria-controls="zip-help-box">How to get a ZIP</a>
+        </div>
+        <div id="zip-help-box" class="help-box" hidden>
+          <p>On GitHub, open your repository, click the green Code button, then Download ZIP.</p>
+          <p>Your project is read in your browser. Nothing is uploaded anywhere.</p>
+        </div>
       </div>
-    </form>
+    </div>
 
     <div id="status" class="status-line" role="status" aria-live="polite"></div>
 
@@ -70,6 +96,10 @@
       <div id="file-tree" class="file-tree" role="tree"></div>
 
       <div class="tree-footer">
+        <div class="tree-footer-nav">
+          <button type="button" id="tree-back-btn">Back</button>
+          <button type="button" id="tree-start-over-btn">Start over</button>
+        </div>
         <div id="selection-summary" class="selection-summary">
           <span id="selected-count">0</span> <span id="selected-label">files selected</span>
         </div>
@@ -91,7 +121,10 @@
       <ul id="order-list" class="order-list" role="list"></ul>
 
       <div class="order-footer">
-        <button type="button" id="order-back-btn">Back</button>
+        <div class="order-footer-nav">
+          <button type="button" id="order-back-btn">Back</button>
+          <button type="button" id="order-start-over-btn">Start over</button>
+        </div>
         <button type="button" id="order-next-btn">Next</button>
       </div>
     </div>
@@ -145,7 +178,10 @@
       </div>
 
       <div class="fetch-footer">
-        <button type="button" id="fetch-back-btn">Back</button>
+        <div class="fetch-footer-nav">
+          <button type="button" id="fetch-back-btn">Back</button>
+          <button type="button" id="fetch-start-over-btn">Start over</button>
+        </div>
       </div>
     </div>
   </div>
@@ -153,6 +189,7 @@
   <!-- Print-ready document view (hidden on screen, visible during window.print()) -->
   <div id="print-view" class="print-view" aria-hidden="true"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="app.js"></script>

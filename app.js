@@ -2540,3 +2540,96 @@ if (form) {
 } else if (loadBtn) {
   loadBtn.addEventListener('click', handleLoad);
 }
+
+// ==========================================================================
+// Subtle Tech Background Icons
+// ==========================================================================
+(function initTechBackground() {
+  const container = document.getElementById('tech-bg-layer');
+  if (!container) return;
+
+  const TECH_ICONS = [
+    // Terminal
+    '<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+    // Code brackets </>
+    '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+    // Braces { }
+    '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>',
+    // Git branch
+    '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+    // Git commit
+    '<circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/>',
+    // Git merge
+    '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+    // Git pull request
+    '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>',
+    // CPU / Chip
+    '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+    // Database
+    '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+    // Server
+    '<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+    // File code
+    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/>',
+    // Command key
+    '<path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>',
+    // Hash
+    '<line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>',
+    // Layers
+    '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+    // Box / Package
+    '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    // Cloud
+    '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+    // Network / Share
+    '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+    // Sliders
+    '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+    // Webhook / Circuit
+    '<path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>',
+    // Shield / Security
+    '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+  ];
+
+  // Jittered grid ensures even full-page distribution without overlapping clusters
+  const cols = 8;
+  const rows = 6;
+  const cellW = 100 / cols;
+  const cellH = 100 / rows;
+  const fragment = document.createDocumentFragment();
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const iconMarkup = TECH_ICONS[Math.floor(Math.random() * TECH_ICONS.length)];
+      const el = document.createElement('span');
+      const isAccent = Math.random() < 0.22;
+      el.className = isAccent ? 'tech-bg-icon tech-bg-icon--accent' : 'tech-bg-icon';
+
+      const x = (col + 0.18 + Math.random() * 0.64) * cellW;
+      const y = (row + 0.18 + Math.random() * 0.64) * cellH;
+      const size = Math.round(18 + Math.random() * 16);
+      const rotate = Math.round(-28 + Math.random() * 56);
+      const opacity = (isAccent ? 0.04 + Math.random() * 0.035 : 0.03 + Math.random() * 0.035).toFixed(3);
+      const duration = (14 + Math.random() * 12).toFixed(1) + 's';
+      const delay = (-Math.random() * 14).toFixed(1) + 's';
+      const floatY = Math.round(-10 + Math.random() * 20) + 'px';
+      const floatTilt = Math.round(-6 + Math.random() * 12) + 'deg';
+
+      el.style.left = x.toFixed(2) + '%';
+      el.style.top = y.toFixed(2) + '%';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.setProperty('--icon-rotate', rotate + 'deg');
+      el.style.setProperty('--icon-opacity', opacity);
+      el.style.setProperty('--float-duration', duration);
+      el.style.setProperty('--float-delay', delay);
+      el.style.setProperty('--float-y', floatY);
+      el.style.setProperty('--float-tilt', floatTilt);
+
+      el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${iconMarkup}</svg>`;
+      fragment.appendChild(el);
+    }
+  }
+
+  container.appendChild(fragment);
+})();

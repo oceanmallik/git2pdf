@@ -88,8 +88,56 @@ body {
   color: var(--text-body);
   line-height: 1.5;
   min-height: 100vh;
+  position: relative;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   TECH BACKGROUND ICONS LAYER
+   ========================================================================== */
+.tech-bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tech-bg-icon {
+  position: absolute;
+  color: var(--text-primary);
+  opacity: var(--icon-opacity, 0.045);
+  transform: translate(-50%, -50%) rotate(var(--icon-rotate, 0deg));
+  animation: techIconFloat var(--float-duration, 18s) ease-in-out var(--float-delay, 0s) infinite alternate;
+  will-change: transform;
+}
+
+.tech-bg-icon--accent {
+  color: var(--accent);
+}
+
+.tech-bg-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes techIconFloat {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--icon-rotate, 0deg)) translateY(0px);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(calc(var(--icon-rotate, 0deg) + var(--float-tilt, 4deg))) translateY(var(--float-y, -8px));
+  }
+}
+
+@media (max-width: 640px) {
+  .tech-bg-icon:nth-child(even) {
+    display: none;
+  }
 }
 
 /* Headings */
@@ -137,6 +185,8 @@ a:hover {
   margin: 0 auto;
   padding: 0 var(--space-6);
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .workspace-container {
@@ -1704,6 +1754,8 @@ input[type="checkbox"] {
   background-color: var(--bg-page);
   padding: var(--space-8) 0;
   margin-top: var(--section-gap);
+  position: relative;
+  z-index: 1;
 }
 
 .footer-inner {
@@ -1837,6 +1889,7 @@ input[type="checkbox"] {
     margin: 0 !important;
   }
 
+  .tech-bg-layer,
   .site-header,
   .hero-section,
   .steps-nav,

@@ -1344,6 +1344,10 @@ input[type="checkbox"] {
   box-shadow: none;
 }
 
+.tree-container {
+  overflow: clip;
+}
+
 .tree-container:hover,
 .order-container:hover,
 .fetch-container:hover {
@@ -1384,6 +1388,12 @@ input[type="checkbox"] {
   gap: var(--space-2);
 }
 
+.tree-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
 .tree-footer-nav,
 .order-footer-nav,
 .fetch-footer-nav {
@@ -1404,21 +1414,8 @@ input[type="checkbox"] {
 /* Tree list */
 .file-tree {
   padding: var(--space-3) var(--space-4);
-  max-height: 480px;
-  overflow-y: auto;
   font-size: var(--text-14);
   user-select: none;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.file-tree::-webkit-scrollbar {
-  width: 4px;
-}
-
-.file-tree::-webkit-scrollbar-thumb {
-  background-color: var(--border);
-  border-radius: 4px;
 }
 
 .tree-node {

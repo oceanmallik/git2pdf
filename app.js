@@ -19,11 +19,15 @@ window.processedFiles = processedFiles;
 var readmePreviewModes = new Map();
 window.readmePreviewModes = readmePreviewModes;
 
-// Helper: Check if a file counts as a README
-function isReadmeFile(filePath) {
+// Helper: Check if a file is a Markdown file (.md or .markdown)
+function isMarkdownFile(filePath) {
   if (!filePath || typeof filePath !== 'string') return false;
   const fileName = filePath.split('/').pop().toLowerCase();
-  return fileName === 'readme.md' || fileName === 'readme.markdown';
+  return fileName.endsWith('.md') || fileName.endsWith('.markdown');
+}
+
+function isReadmeFile(filePath) {
+  return isMarkdownFile(filePath);
 }
 
 // Helper: Resolve relative paths for images in markdown

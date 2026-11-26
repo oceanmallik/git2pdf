@@ -183,8 +183,10 @@ const EXTENSION_TO_LANGUAGE = {
 const inputSection = document.getElementById('input-section') || document.querySelector('.input-section');
 const tabGithubBtn = document.getElementById('tab-github-btn');
 const tabZipBtn = document.getElementById('tab-zip-btn');
+const tabFilesBtn = document.getElementById('tab-files-btn');
 const tabGithubPanel = document.getElementById('tab-github-panel');
 const tabZipPanel = document.getElementById('tab-zip-panel');
+const tabFilesPanel = document.getElementById('tab-files-panel');
 
 const form = document.getElementById('repo-form');
 const repoUrlInput = document.getElementById('repo-url') || document.querySelector('input[type="text"]');
@@ -258,7 +260,47 @@ const pdfBwBtn = document.getElementById('pdf-bw-btn');
 const printViewEl = document.getElementById('print-view');
 
 // State
-var activeTab = 'github'; // 'github' or 'zip'
+var activeTab = 'github'; // 'github', 'zip', or 'files'
+
+function switchSourceTab(tab) {
+  const tabs = [
+    { key: 'github', btn: tabGithubBtn, panel: tabGithubPanel },
+    { key: 'zip', btn: tabZipBtn, panel: tabZipPanel },
+    { key: 'files', btn: tabFilesBtn, panel: tabFilesPanel }
+  ];
+  if (!tabs.some(t => t.key === tab)) return;
+
+  activeTab = tab;
+  for (const item of tabs) {
+    const isActive = item.key === tab;
+    if (item.btn) {
+      item.btn.classList.toggle('active', isActive);
+      item.btn.setAttribute('aria-selected', String(isActive));
+    }
+    if (item.panel) {
+      item.panel.hidden = !isActive;
+    }
+  }
+  setStatus('');
+}
+
+const sourceTabButtons = [tabGithubBtn, tabZipBtn, tabFilesBtn].filter(Boolean);
+sourceTabButtons.forEach((btn, idx) => {
+  btn.addEventListener('click', () => {
+    switchSourceTab(btn.dataset.sourceTab);
+  });
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      const nextBtn = sourceTabButtons[(idx + dir + sourceTabButtons.length) % sourceTabButtons.length];
+      if (nextBtn) {
+        switchSourceTab(nextBtn.dataset.sourceTab);
+        nextBtn.focus();
+      }
+    }
+  });
+});
 var selectedFilePaths = new Set();
 var currentTreeRoot = null;
 var allFileNodes = [];

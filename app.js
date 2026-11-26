@@ -255,12 +255,18 @@ const fontSelectEl = document.getElementById('font-select');
 const fontSizeSelectEl = document.getElementById('font-size-select');
 const pdfColourBtn = document.getElementById('pdf-colour-btn');
 const pdfBwBtn = document.getElementById('pdf-bw-btn');
+const pdfPreviewContainerEl = document.getElementById('pdf-preview-container');
+const pdfPreviewPageBadgeEl = document.getElementById('pdf-preview-page-badge');
+const pdfPreviewSheetEl = document.getElementById('pdf-preview-sheet');
+const previewColourBtn = document.getElementById('preview-colour-btn');
+const previewBwBtn = document.getElementById('preview-bw-btn');
 
 // DOM Elements: Print View
 const printViewEl = document.getElementById('print-view');
 
 // State
 var activeTab = 'github'; // 'github', 'zip', or 'files'
+var currentPreviewMode = 'colour'; // 'colour' or 'bw'
 
 function switchSourceTab(tab) {
   const tabs = [
@@ -595,6 +601,8 @@ function clearState() {
   if (fileTreeEl) fileTreeEl.innerHTML = '';
   if (orderListEl) orderListEl.innerHTML = '';
   if (skippedListEl) skippedListEl.innerHTML = '';
+  if (pdfPreviewSheetEl) pdfPreviewSheetEl.innerHTML = '';
+  if (pdfPreviewContainerEl) pdfPreviewContainerEl.hidden = true;
   if (printViewEl) printViewEl.innerHTML = '';
 
   if (treeContainer) treeContainer.hidden = true;
@@ -1976,6 +1984,8 @@ async function openFetchScreen() {
   if (skippedContainerEl) skippedContainerEl.hidden = true;
   if (skippedListEl) skippedListEl.innerHTML = '';
   if (pdfControlsEl) pdfControlsEl.hidden = true;
+  if (pdfPreviewContainerEl) pdfPreviewContainerEl.hidden = true;
+  if (pdfPreviewSheetEl) pdfPreviewSheetEl.innerHTML = '';
   if (fetchBackBtn) fetchBackBtn.disabled = true;
 
   let results = [];
@@ -2076,6 +2086,9 @@ async function openFetchScreen() {
   }
   if (pdfControlsEl) {
     pdfControlsEl.hidden = false;
+  }
+  if (processedFiles.length > 0) {
+    renderPdfPreview(currentPreviewMode);
   }
 }
 
@@ -2221,6 +2234,98 @@ function waitForPreviewImages(container, timeoutMs = 8000) {
   });
 }
 
+// Shared helper to render a code file section (used by full print/modal and single-page preview)
+function renderCodeFileSectionHtml(file, extraClass = '', maxLines = Infinity) {
+  const totalLines = file.lines ? file.lines.length : 0;
+  const visibleLines = isFinite(maxLines) ? (file.lines || []).slice(0, maxLines) : (file.lines || []);
+  const firstLines = visibleLines.slice(0, 3);
+  const restLines = visibleLines.slice(3);
+
+  let html = `<div class="file-section${extraClass}">`;
+  html += '<div class="file-header-group">';
+  html += '<div class="file-header-bar">';
+  html += `<span class="file-header-path">${escapeHtml(file.path)}</span>`;
+  html += `<span class="file-header-lines">${totalLines} lines</span>`;
+  html += '</div>';
+
+  html += '<div class="file-code">';
+  firstLines.forEach((lineHtml, idx) => {
+    const lineNum = idx + 1;
+    const content = lineHtml || '&#8203;';
+    html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
+  });
+  html += '</div>';
+  html += '</div>'; // close file-header-group
+
+  if (restLines.length > 0) {
+    html += '<div class="file-code">';
+    restLines.forEach((lineHtml, idx) => {
+      const lineNum = idx + 4;
+      const content = lineHtml || '&#8203;';
+      html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  html += '</div>'; // close file-section
+  return html;
+}
+
+// Build single-page preview starting where the code really starts (skipping cover page & TOC)
+function renderSingleCodePageHtml(files) {
+  if (!files || files.length === 0) {
+    return { html: '', startFilePath: '' };
+  }
+
+  let startIndex = files.findIndex(
+    f => !(isReadmeFile(f.path) && readmePreviewModes.get(f.path) === 'preview')
+  );
+  if (startIndex === -1) {
+    startIndex = 0;
+  }
+
+  const firstFile = files[startIndex];
+  const isFirstPreview = isReadmeFile(firstFile.path) && readmePreviewModes.get(firstFile.path) === 'preview';
+  if (isFirstPreview) {
+    try {
+      const previewHtml = renderMarkdownPreview(firstFile.originalText || '', firstFile.path);
+      return {
+        html: `
+          <div class="file-section">
+            <div class="file-header-group">
+              <div class="file-header-bar">
+                <span class="file-header-path">${escapeHtml(firstFile.path)}</span>
+              </div>
+            </div>
+            <div class="readme-preview-content">${previewHtml}</div>
+          </div>
+        `,
+        startFilePath: firstFile.path
+      };
+    } catch (_) {
+      if (!firstFile.lines || firstFile.lines.length === 0) {
+        const lang = firstFile.language || detectLanguage(firstFile.path);
+        firstFile.lines = splitHighlightedIntoLines(highlightCode(firstFile.originalText || '', lang));
+      }
+    }
+  }
+
+  let html = '';
+  let remainingBudget = 55;
+  for (let i = startIndex; i < files.length && remainingBudget > 0; i++) {
+    const f = files[i];
+    if (isReadmeFile(f.path) && readmePreviewModes.get(f.path) === 'preview') {
+      break;
+    }
+    const lineCount = f.lines ? f.lines.length : 0;
+    const take = Math.min(lineCount, remainingBudget);
+    html += renderCodeFileSectionHtml(f, '', take);
+    remainingBudget -= (take + 4); // account for file header height
+  }
+
+  return { html, startFilePath: firstFile.path };
+}
+
 // Build the print-ready HTML
 function renderPrintHtml(repoName, branch, files) {
   let html = '';
@@ -2278,36 +2383,7 @@ function renderPrintHtml(repoName, branch, files) {
       prevWasPreview = true;
     } else {
       const extraClass = prevWasPreview ? ' after-preview' : '';
-      html += `<div class="file-section${extraClass}">`;
-      html += '<div class="file-header-group">';
-      html += '<div class="file-header-bar">';
-      html += `<span class="file-header-path">${escapeHtml(f.path)}</span>`;
-      html += `<span class="file-header-lines">${f.lines ? f.lines.length : 0} lines</span>`;
-      html += '</div>';
-
-      const firstLines = (f.lines || []).slice(0, 3);
-      const restLines = (f.lines || []).slice(3);
-
-      html += '<div class="file-code">';
-      firstLines.forEach((lineHtml, idx) => {
-        const lineNum = idx + 1;
-        const content = lineHtml || '&#8203;';
-        html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
-      });
-      html += '</div>';
-      html += '</div>'; // close file-header-group
-
-      if (restLines.length > 0) {
-        html += '<div class="file-code">';
-        restLines.forEach((lineHtml, idx) => {
-          const lineNum = idx + 4;
-          const content = lineHtml || '&#8203;';
-          html += `<div class="code-line"><span class="line-number">${lineNum}</span><span class="line-content">${content}</span></div>`;
-        });
-        html += '</div>';
-      }
-
-      html += '</div>'; // close file-section
+      html += renderCodeFileSectionHtml(f, extraClass);
       prevWasPreview = false;
     }
   }
@@ -2315,16 +2391,91 @@ function renderPrintHtml(repoName, branch, files) {
   return html;
 }
 
+function getSelectedTypography() {
+  const fontSelect = fontSelectEl || document.getElementById('font-select');
+  const fontSizeSelect = fontSizeSelectEl || document.getElementById('font-size-select');
+  return {
+    chosenFont: fontSelect ? fontSelect.value : "'JetBrains Mono', monospace",
+    chosenSize: fontSizeSelect ? fontSizeSelect.value : '9pt'
+  };
+}
+
+function getDocumentMeta() {
+  if (currentSource === 'files') {
+    return { projectName: 'Uploaded files', branchName: '' };
+  }
+  if (currentSource === 'zip') {
+    return {
+      projectName: (currentZipFileName || 'Project').replace(/\.zip$/i, ''),
+      branchName: ''
+    };
+  }
+  const owner = currentOwner || window.currentOwner || '';
+  const repo = currentRepo || window.currentRepo || '';
+  return {
+    projectName: (owner && repo) ? `${owner}/${repo}` : (repo || 'Repository'),
+    branchName: currentBranch || window.currentBranch || 'main'
+  };
+}
+
+function applyDocumentTheme(targetEl, baseClass, mode, chosenFont, chosenSize) {
+  const footerColor = (mode === 'bw') ? '#000000' : '#57606a';
+  targetEl.className = `${baseClass} pdf-document ${mode === 'bw' ? 'bw-mode' : 'colour-mode'}`;
+  targetEl.style.setProperty('--code-font', chosenFont);
+  targetEl.style.setProperty('--code-font-size', chosenSize);
+  targetEl.style.setProperty('--footer-color', footerColor);
+  return footerColor;
+}
+
+function updatePreviewModeButtons(mode) {
+  const isBw = mode === 'bw';
+  if (previewColourBtn) {
+    previewColourBtn.classList.toggle('selected', !isBw);
+    previewColourBtn.setAttribute('aria-checked', String(!isBw));
+  }
+  if (previewBwBtn) {
+    previewBwBtn.classList.toggle('selected', isBw);
+    previewBwBtn.setAttribute('aria-checked', String(isBw));
+  }
+}
+
+// Render single-page code preview in Step 4
+function renderPdfPreview(mode = currentPreviewMode) {
+  if (!pdfPreviewContainerEl || !pdfPreviewSheetEl) return;
+  if (!window.processedFiles || window.processedFiles.length === 0) {
+    pdfPreviewContainerEl.hidden = true;
+    pdfPreviewSheetEl.innerHTML = '';
+    return;
+  }
+
+  currentPreviewMode = (mode === 'bw') ? 'bw' : 'colour';
+  updatePreviewModeButtons(currentPreviewMode);
+
+  const { chosenFont, chosenSize } = getSelectedTypography();
+  applyDocumentTheme(
+    pdfPreviewSheetEl,
+    'pdf-preview-sheet pdf-preview-sheet--single',
+    currentPreviewMode,
+    chosenFont,
+    chosenSize
+  );
+
+  const { html, startFilePath } = renderSingleCodePageHtml(window.processedFiles);
+  pdfPreviewSheetEl.innerHTML = html;
+  if (pdfPreviewPageBadgeEl) {
+    pdfPreviewPageBadgeEl.textContent = startFilePath ? `Page 1 · ${startFilePath}` : 'Page 1';
+    pdfPreviewPageBadgeEl.title = startFilePath || '';
+  }
+  pdfPreviewContainerEl.hidden = false;
+}
+
 // Generate print view and trigger window.print()
 async function printDocument(mode) {
   if (!window.processedFiles || window.processedFiles.length === 0) return;
   if (!printViewEl) return;
 
-  const fontSelect = fontSelectEl || document.getElementById('font-select');
-  const fontSizeSelect = fontSizeSelectEl || document.getElementById('font-size-select');
-  const chosenFont = fontSelect ? fontSelect.value : "'JetBrains Mono', monospace";
-  const chosenSize = fontSizeSelect ? fontSizeSelect.value : '9pt';
-  const footerColor = (mode === 'bw') ? '#000000' : '#57606a';
+  const { chosenFont, chosenSize } = getSelectedTypography();
+  const footerColor = applyDocumentTheme(printViewEl, 'print-view', mode, chosenFont, chosenSize);
 
   // Apply to document root for @page margin boxes
   if (document.documentElement && document.documentElement.style) {
@@ -2332,12 +2483,6 @@ async function printDocument(mode) {
     document.documentElement.style.setProperty('--code-font-size', chosenSize);
     document.documentElement.style.setProperty('--footer-color', footerColor);
   }
-
-  // Apply mode
-  printViewEl.className = 'print-view ' + (mode === 'bw' ? 'bw-mode' : 'colour-mode');
-  printViewEl.style.setProperty('--code-font', chosenFont);
-  printViewEl.style.setProperty('--code-font-size', chosenSize);
-  printViewEl.style.setProperty('--footer-color', footerColor);
 
   // Dynamic @page style tag for browser engines with strict @page margin box styling
   let pageStyle = document.getElementById('print-page-style');
@@ -2366,22 +2511,7 @@ async function printDocument(mode) {
   `;
 
   // Render print-ready document HTML
-  let projectName = '';
-  let branchName = '';
-
-  if (currentSource === 'files') {
-    projectName = 'Uploaded files';
-    branchName = ''; // Hide branch line for uploaded files
-  } else if (currentSource === 'zip') {
-    projectName = (currentZipFileName || 'Project').replace(/\.zip$/i, '');
-    branchName = ''; // Hide branch line for ZIP projects
-  } else {
-    const owner = currentOwner || window.currentOwner || '';
-    const repo = currentRepo || window.currentRepo || '';
-    branchName = currentBranch || window.currentBranch || 'main';
-    projectName = (owner && repo) ? `${owner}/${repo}` : (repo || 'Repository');
-  }
-
+  const { projectName, branchName } = getDocumentMeta();
   printViewEl.innerHTML = renderPrintHtml(projectName, branchName, window.processedFiles);
 
   // Wait for Google Fonts and preview images before printing (max 8s)
@@ -2396,15 +2526,45 @@ async function printDocument(mode) {
   window.print();
 }
 
-// Bind PDF Export Buttons
+// Bind PDF Preview & Export Controls
+if (previewColourBtn) {
+  previewColourBtn.addEventListener('click', () => {
+    renderPdfPreview('colour');
+  });
+}
+
+if (previewBwBtn) {
+  previewBwBtn.addEventListener('click', () => {
+    renderPdfPreview('bw');
+  });
+}
+
+if (fontSelectEl) {
+  fontSelectEl.addEventListener('change', () => {
+    if (window.processedFiles && window.processedFiles.length > 0) {
+      renderPdfPreview(currentPreviewMode);
+    }
+  });
+}
+
+if (fontSizeSelectEl) {
+  fontSizeSelectEl.addEventListener('change', () => {
+    if (window.processedFiles && window.processedFiles.length > 0) {
+      renderPdfPreview(currentPreviewMode);
+    }
+  });
+}
+
 if (pdfColourBtn) {
   pdfColourBtn.addEventListener('click', () => {
+    renderPdfPreview('colour');
     return printDocument('colour');
   });
 }
 
 if (pdfBwBtn) {
   pdfBwBtn.addEventListener('click', () => {
+    renderPdfPreview('bw');
     return printDocument('bw');
   });
 }

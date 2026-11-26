@@ -480,6 +480,25 @@
             </div>
           </div>
 
+          <!-- Single-Page Code Preview -->
+          <div id="pdf-preview-container" class="pdf-preview-container" hidden>
+            <div class="pdf-preview-toolbar">
+              <div class="pdf-preview-title-group">
+                <span class="pdf-preview-title">Code preview</span>
+                <span id="pdf-preview-page-badge" class="badge pdf-preview-page-badge">Page 1</span>
+              </div>
+              <div class="pdf-preview-actions">
+                <div class="readme-mode-toggle pdf-preview-mode-toggle" role="radiogroup" aria-label="Preview color mode">
+                  <button type="button" id="preview-colour-btn" class="readme-mode-btn selected" role="radio" aria-checked="true">Colour</button>
+                  <button type="button" id="preview-bw-btn" class="readme-mode-btn" role="radio" aria-checked="false">B&amp;W</button>
+                </div>
+              </div>
+            </div>
+            <div class="pdf-preview-viewport pdf-preview-viewport--single">
+              <div id="pdf-preview-sheet" class="pdf-preview-sheet pdf-preview-sheet--single pdf-document colour-mode"></div>
+            </div>
+          </div>
+
           <div class="fetch-footer">
             <div class="fetch-footer-nav">
               <button type="button" id="fetch-back-btn">Back</button>
@@ -502,7 +521,7 @@
   </footer>
 
   <!-- Print-ready document view (hidden on screen, visible during window.print()) -->
-  <div id="print-view" class="print-view" aria-hidden="true"></div>
+  <div id="print-view" class="print-view pdf-document" aria-hidden="true"></div>
 
   <!-- External libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
